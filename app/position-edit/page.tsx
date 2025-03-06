@@ -26,7 +26,7 @@ export default function PositionEditPage() {
     fetchPositions();
   }, []);
 
-  // 登録済みポジションを取得
+  // 登録済みポジションを取得する
   const fetchPositions = async () => {
     const res = await fetch("/api/positions");
     if (res.ok) {
@@ -35,16 +35,16 @@ export default function PositionEditPage() {
     }
   };
 
-  // セル選択コンポーネントからのコールバック
-  const handleSelectCell = (cell: string) => {
-    setFormData({ ...formData, outputCell: cell });
+  // CellSelector の変更を受け取って positions を更新
+  const handleCellUpdate = (updatedPositions: Position[]) => {
+    setPositions(updatedPositions);
   };
 
-  // フォーム送信時の処理
+  // フォーム送信時の処理（新規登録または更新）
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      // 更新の場合：PUTリクエスト
+      // 更新の場合：PUT リクエスト
       const res = await fetch("/api/positions", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +62,7 @@ export default function PositionEditPage() {
         });
       }
     } else {
-      // 新規登録の場合：POSTリクエスト
+      // 新規登録の場合：POST リクエスト
       const res = await fetch("/api/positions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,13 +82,13 @@ export default function PositionEditPage() {
     }
   };
 
-  // 一覧から編集対象を選択
+  // 一覧から編集対象を選択し、フォームに値をロードする
   const handleEdit = (pos: Position) => {
     setEditingId(pos.id || null);
     setFormData(pos);
   };
 
-  // 編集モードを解除し、新規登録モードに戻す
+  // 編集モードを解除して新規登録状態に戻す
   const handleClear = () => {
     setEditingId(null);
     setFormData({
@@ -119,11 +119,8 @@ export default function PositionEditPage() {
         <div>
           <label className="block mb-1">出力セル:</label>
           <div className="mb-2">
-            {/* セルを視覚的に選択するためのグリッド */}
-            <CellSelector
-              selectedCell={formData.outputCell}
-              onSelect={handleSelectCell}
-            />
+            {/* CellSelector コンポーネント：グリッド上で割り当て状態を視覚的にプレビューし、変更可能にする */}
+            <CellSelector positions={positions} onChange={handleCellUpdate} />
           </div>
           {formData.outputCell && (
             <div className="text-sm text-gray-700">
@@ -197,16 +194,15 @@ export default function PositionEditPage() {
       <h2 className="text-xl font-semibold mb-2">
         登録済ポジション一覧とプレビュー
       </h2>
-      <ul className="space-y-2">
+      <ul className="space-y-2 mt-4">
         {positions.map((pos) => (
           <li
             key={pos.id}
             onClick={() => handleEdit(pos)}
             className="cursor-pointer border border-gray-300 p-2 rounded hover:bg-gray-100"
           >
-            {pos.name} — 出力セル: {pos.outputCell} — 優先度: {pos.priority} —{" "}
-            {pos.required ? "必須" : "任意"} —{" "}
-            {pos.sameStaffWeekly ? "同一" : "変更"}
+            {pos.name} — 出力セル: {pos.outputCell || "未設定"} — 優先度: {pos.priority} —{" "}
+            {pos.required ? "必須" : "任意"} — {pos.sameStaffWeekly ? "同一" : "変更"}
           </li>
         ))}
       </ul>
@@ -214,18 +210,58 @@ export default function PositionEditPage() {
   );
 }
 
-// 簡易なExcel風グリッドコンポーネント
+// 更新版 CellSelector コンポーネント
 interface CellSelectorProps {
-  selectedCell: string;
-  onSelect: (cell: string) => void;
+  positions: Position[]; // 登録済みの全ポジション（outputCell を含む）
+  onChange: (updatedPositions: Position[]) => void;
 }
 
-function CellSelector({ selectedCell, onSelect }: CellSelectorProps) {
-  // 例として、列はA～H、行は1～10とする
-  const columns = Array.from({ length: 8 }, (_, i) =>
-    String.fromCharCode(65 + i)
-  );
+function CellSelector({ positions, onChange }: CellSelectorProps) {
+  // 表示するグリッドの列（A～H）と行（1～10）
+  const columns = Array.from({ length: 10 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 10 }, (_, i) => i + 1);
+
+  // 現在のセル割り当てをマッピング：キー＝セルID、値＝そのセルに割り当てられているポジションの配列
+  const cellAssignments: { [cell: string]: Position[] } = {};
+  positions.forEach((pos) => {
+    if (pos.outputCell) {
+      if (!cellAssignments[pos.outputCell]) {
+        cellAssignments[pos.outputCell] = [];
+      }
+      cellAssignments[pos.outputCell].push(pos);
+    }
+  });
+
+  // セルをクリックしたときの処理
+  const handleCellClick = (cell: string) => {
+    // 既に割り当てがある場合は解除確認
+    if (cellAssignments[cell]?.length) {
+      const confirmRemove = confirm(
+        `セル ${cell} に割り当てられている [${cellAssignments[cell]
+          .map((p) => p.name)
+          .join(", ")}] を解除しますか？`
+      );
+      if (confirmRemove) {
+        const updatedPositions = positions.map((pos) =>
+          pos.outputCell === cell ? { ...pos, outputCell: "" } : pos
+        );
+        onChange(updatedPositions);
+      }
+    } else {
+      // まだ割り当てられていないセルの場合、どのポジションをそのセルに割り当てるかをプロンプトで入力
+      const newPosId = prompt(`セル ${cell} に割り当てるポジションのIDを入力してください。`);
+      if (newPosId) {
+        const posIndex = positions.findIndex((p) => p.id === newPosId);
+        if (posIndex !== -1) {
+          const updatedPositions = [...positions];
+          updatedPositions[posIndex] = { ...updatedPositions[posIndex], outputCell: cell };
+          onChange(updatedPositions);
+        } else {
+          alert("該当するポジションが見つかりませんでした。");
+        }
+      }
+    }
+  };
 
   return (
     <table className="border-collapse">
@@ -234,16 +270,19 @@ function CellSelector({ selectedCell, onSelect }: CellSelectorProps) {
           <tr key={row}>
             {columns.map((col) => {
               const cell = `${col}${row}`;
-              const isSelected = cell === selectedCell;
+              const assignedPositions = cellAssignments[cell] || [];
               return (
                 <td
                   key={cell}
-                  onClick={() => onSelect(cell)}
-                  className={`border border-gray-400 p-2 text-center w-8 h-8 cursor-pointer ${
-                    isSelected ? "bg-blue-200" : "bg-white"
-                  }`}
+                  onClick={() => handleCellClick(cell)}
+                  className="border border-gray-400 p-2 text-center w-12 h-12 cursor-pointer"
                 >
-                  {cell}
+                  <div className="text-sm">{cell}</div>
+                  {assignedPositions.map((pos) => (
+                    <div key={pos.id} className="text-xs bg-blue-100 rounded px-1">
+                      {pos.name}
+                    </div>
+                  ))}
                 </td>
               );
             })}
