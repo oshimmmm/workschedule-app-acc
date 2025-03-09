@@ -10,6 +10,7 @@ export default function Header() {
           <li><Link href="/position-edit">ポジション編集</Link></li>
           <li><Link href="/staff-edit">スタッフ編集</Link></li>
           <li><Link href="/holiday-edit">休み編集</Link></li>
+          <li><Link href="/blood-edit">採血者編集</Link></li>
           <li><Link href="/staff-list">スタッフリスト</Link></li>
         </ul>
       </nav>

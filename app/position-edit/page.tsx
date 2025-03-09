@@ -8,6 +8,7 @@ interface Position {
   priority: number;
   required: boolean;
   sameStaffWeekly: boolean;
+  allowMultiple: boolean;
 }
 
 export default function PositionEditPage() {
@@ -20,6 +21,7 @@ export default function PositionEditPage() {
     priority: 1,
     required: false,
     sameStaffWeekly: false,
+    allowMultiple: false,
   });
 
   useEffect(() => {
@@ -38,6 +40,11 @@ export default function PositionEditPage() {
   // CellSelector の変更を受け取って positions を更新
   const handleCellUpdate = (updatedPositions: Position[]) => {
     setPositions(updatedPositions);
+  };
+
+  // セル選択時のコールバック：新規登録の場合はフォームの outputCell を更新
+  const handleCellSelect = (cell: string) => {
+    setFormData({ ...formData, outputCell: cell });
   };
 
   // フォーム送信時の処理（新規登録または更新）
@@ -59,6 +66,7 @@ export default function PositionEditPage() {
           priority: 1,
           required: false,
           sameStaffWeekly: false,
+          allowMultiple: false,
         });
       }
     } else {
@@ -77,6 +85,7 @@ export default function PositionEditPage() {
           priority: 1,
           required: false,
           sameStaffWeekly: false,
+          allowMultiple: false,
         });
       }
     }
@@ -97,15 +106,16 @@ export default function PositionEditPage() {
       priority: 1,
       required: false,
       sameStaffWeekly: false,
+      allowMultiple: false,
     });
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">ポジション編集</h1>
-      <form onSubmit={handleSubmit} className="mb-8 space-y-4">
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6 text-center">ポジション編集</h1>
+      <form onSubmit={handleSubmit} className="mb-8 space-y-6 bg-white p-6 shadow rounded">
         <div>
-          <label className="block mb-1">ポジション名:</label>
+          <label className="block mb-2 font-medium">ポジション名:</label>
           <input
             type="text"
             value={formData.name}
@@ -113,14 +123,18 @@ export default function PositionEditPage() {
               setFormData({ ...formData, name: e.target.value })
             }
             required
-            className="w-full p-2 border border-gray-300 rounded"
+            className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-400"
           />
         </div>
         <div>
-          <label className="block mb-1">出力セル:</label>
+          <label className="block mb-2 font-medium">出力セル:</label>
           <div className="mb-2">
-            {/* CellSelector コンポーネント：グリッド上で割り当て状態を視覚的にプレビューし、変更可能にする */}
-            <CellSelector positions={positions} onChange={handleCellUpdate} />
+            {/* Excel風プレビューとしての CellSelector に onCellSelect を追加 */}
+            <CellSelector
+              positions={positions}
+              onChange={handleCellUpdate}
+              onCellSelect={handleCellSelect}
+            />
           </div>
           {formData.outputCell && (
             <div className="text-sm text-gray-700">
@@ -129,7 +143,9 @@ export default function PositionEditPage() {
           )}
         </div>
         <div>
-          <label className="block mb-1">スタッフ配置の優先順位:</label>
+          <label className="block mb-2 font-medium">
+            スタッフ配置の優先順位:
+          </label>
           <input
             type="number"
             value={formData.priority}
@@ -140,10 +156,10 @@ export default function PositionEditPage() {
               })
             }
             required
-            className="w-full p-2 border border-gray-300 rounded"
+            className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-400"
           />
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
           <label className="flex items-center">
             <input
               type="checkbox"
@@ -151,12 +167,10 @@ export default function PositionEditPage() {
               onChange={(e) =>
                 setFormData({ ...formData, required: e.target.checked })
               }
-              className="mr-1"
+              className="mr-2"
             />
             必ず1名配置
           </label>
-        </div>
-        <div className="flex items-center space-x-2">
           <label className="flex items-center">
             <input
               type="checkbox"
@@ -167,15 +181,28 @@ export default function PositionEditPage() {
                   sameStaffWeekly: e.target.checked,
                 })
               }
-              className="mr-1"
+              className="mr-2"
             />
             1週間（月～金）同一スタッフ
           </label>
         </div>
-        <div className="space-x-2">
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.allowMultiple}
+              onChange={(e) =>
+                setFormData({ ...formData, allowMultiple: e.target.checked })
+              }
+              className="mr-2"
+            />
+            複数人配置を許容する
+          </label>
+        </div>
+        <div className="flex space-x-4">
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
           >
             {editingId ? "更新" : "登録"}
           </button>
@@ -183,7 +210,7 @@ export default function PositionEditPage() {
             <button
               type="button"
               onClick={handleClear}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              className="flex-1 px-4 py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
             >
               クリア
             </button>
@@ -191,18 +218,19 @@ export default function PositionEditPage() {
         </div>
       </form>
 
-      <h2 className="text-xl font-semibold mb-2">
-        登録済ポジション一覧とプレビュー
-      </h2>
-      <ul className="space-y-2 mt-4">
+      <h2 className="text-2xl font-semibold mb-4">登録済ポジション一覧</h2>
+      <ul className="space-y-3">
         {positions.map((pos) => (
           <li
             key={pos.id}
             onClick={() => handleEdit(pos)}
-            className="cursor-pointer border border-gray-300 p-2 rounded hover:bg-gray-100"
+            className="cursor-pointer border border-gray-300 p-3 rounded hover:bg-gray-100 transition"
           >
-            {pos.name} — 出力セル: {pos.outputCell || "未設定"} — 優先度: {pos.priority} —{" "}
-            {pos.required ? "必須" : "任意"} — {pos.sameStaffWeekly ? "同一" : "変更"}
+            <span className="font-bold">{pos.name}</span> — 出力セル:{" "}
+            {pos.outputCell || "未設定"} — 優先度: {pos.priority} —{" "}
+            {pos.required ? "必須" : "任意"} —{" "}
+            {pos.sameStaffWeekly ? "同一" : "変更"} —{" "}
+            {pos.allowMultiple ? "複数配置可" : "単一配置"}
           </li>
         ))}
       </ul>
@@ -210,18 +238,19 @@ export default function PositionEditPage() {
   );
 }
 
-// 更新版 CellSelector コンポーネント
+// 更新版 CellSelector コンポーネント（onCellSelect プロパティ追加）
 interface CellSelectorProps {
   positions: Position[]; // 登録済みの全ポジション（outputCell を含む）
   onChange: (updatedPositions: Position[]) => void;
+  onCellSelect?: (cell: string) => void;
 }
 
-function CellSelector({ positions, onChange }: CellSelectorProps) {
-  // 表示するグリッドの列（A～H）と行（1～10）
+function CellSelector({ positions, onChange, onCellSelect }: CellSelectorProps) {
+  // Excel風プレビュー: 列は A～J、行は 1～5（例）
   const columns = Array.from({ length: 10 }, (_, i) => String.fromCharCode(65 + i));
-  const rows = Array.from({ length: 10 }, (_, i) => i + 1);
+  const rows = Array.from({ length: 5 }, (_, i) => i + 1);
 
-  // 現在のセル割り当てをマッピング：キー＝セルID、値＝そのセルに割り当てられているポジションの配列
+  // 各セルごとに、どのポジションが割り当てられているかマッピング
   const cellAssignments: { [cell: string]: Position[] } = {};
   positions.forEach((pos) => {
     if (pos.outputCell) {
@@ -232,14 +261,11 @@ function CellSelector({ positions, onChange }: CellSelectorProps) {
     }
   });
 
-  // セルをクリックしたときの処理
   const handleCellClick = (cell: string) => {
-    // 既に割り当てがある場合は解除確認
     if (cellAssignments[cell]?.length) {
+      const currentPosNames = cellAssignments[cell].map((p) => p.name).join(", ");
       const confirmRemove = confirm(
-        `セル ${cell} に割り当てられている [${cellAssignments[cell]
-          .map((p) => p.name)
-          .join(", ")}] を解除しますか？`
+        `セル ${cell} に割り当てられている [${currentPosNames}] を解除しますか？`
       );
       if (confirmRemove) {
         const updatedPositions = positions.map((pos) =>
@@ -248,47 +274,56 @@ function CellSelector({ positions, onChange }: CellSelectorProps) {
         onChange(updatedPositions);
       }
     } else {
-      // まだ割り当てられていないセルの場合、どのポジションをそのセルに割り当てるかをプロンプトで入力
-      const newPosId = prompt(`セル ${cell} に割り当てるポジションのIDを入力してください。`);
-      if (newPosId) {
-        const posIndex = positions.findIndex((p) => p.id === newPosId);
-        if (posIndex !== -1) {
-          const updatedPositions = [...positions];
-          updatedPositions[posIndex] = { ...updatedPositions[posIndex], outputCell: cell };
-          onChange(updatedPositions);
-        } else {
-          alert("該当するポジションが見つかりませんでした。");
+      // onCellSelect が提供されていれば、そのセルを選択したとみなす
+      if (onCellSelect) {
+        onCellSelect(cell);
+      } else {
+        // fallback: プロンプト（古い実装）
+        const newPosId = prompt(`セル ${cell} に割り当てるポジションのIDを入力してください。`);
+        if (newPosId) {
+          const posIndex = positions.findIndex((p) => p.id === newPosId);
+          if (posIndex !== -1) {
+            const updatedPositions = [...positions];
+            updatedPositions[posIndex] = { ...updatedPositions[posIndex], outputCell: cell };
+            onChange(updatedPositions);
+          } else {
+            alert("該当するポジションが見つかりませんでした。");
+          }
         }
       }
     }
   };
 
   return (
-    <table className="border-collapse">
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row}>
-            {columns.map((col) => {
-              const cell = `${col}${row}`;
-              const assignedPositions = cellAssignments[cell] || [];
-              return (
-                <td
-                  key={cell}
-                  onClick={() => handleCellClick(cell)}
-                  className="border border-gray-400 p-2 text-center w-12 h-12 cursor-pointer"
-                >
-                  <div className="text-sm">{cell}</div>
-                  {assignedPositions.map((pos) => (
-                    <div key={pos.id} className="text-xs bg-blue-100 rounded px-1">
-                      {pos.name}
+    <div className="overflow-auto border border-gray-300 shadow-md rounded">
+      <table className="min-w-full table-fixed">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row} className="border-b border-gray-300">
+              {columns.map((col) => {
+                const cell = `${col}${row}`;
+                const assignedPositions = cellAssignments[cell] || [];
+                return (
+                  <td
+                    key={cell}
+                    onClick={() => handleCellClick(cell)}
+                    className="border border-gray-300 p-2 text-center w-16 h-16 cursor-pointer hover:bg-blue-50 transition relative"
+                  >
+                    <div className="absolute top-1 left-1 text-xs text-gray-500">
+                      {cell}
                     </div>
-                  ))}
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+                    {assignedPositions.map((pos) => (
+                      <div key={pos.id} className="mt-4 text-xs bg-blue-100 rounded px-1">
+                        {pos.name}
+                      </div>
+                    ))}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

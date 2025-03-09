@@ -21,6 +21,7 @@ export async function GET() {
 // POST: 新規ポジション情報を登録
 export async function POST(request: Request) {
   const body = await request.json();
+  // 新たに allowMultiple を含める
   const docRef = await addDoc(collection(db, "positions"), body);
   return NextResponse.json({ id: docRef.id, ...body });
 }
