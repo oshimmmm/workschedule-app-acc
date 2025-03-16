@@ -1,3 +1,4 @@
+// app/api/holidays/clear/route.ts
 import { NextResponse } from "next/server";
 import db from "../../../../firebase/db";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
@@ -11,10 +12,19 @@ export async function POST() {
 
   for (const staffDoc of staffSnapshot.docs) {
     const data = staffDoc.data();
-    if (data.holidays && Array.isArray(data.holidays)) {
-      // threshold より新しい日付のみ残す
-      const newHolidays = data.holidays.filter((date: string) => date >= threshold);
-      await updateDoc(doc(db, "staff", staffDoc.id), { holidays: newHolidays });
+    const updates: { [field: string]: string[] } = {};
+
+    if (data.holidaysYukyu && Array.isArray(data.holidaysYukyu)) {
+      updates.holidaysYukyu = data.holidaysYukyu.filter((date: string) => date >= threshold);
+    }
+    if (data.holidaysFurikyu && Array.isArray(data.holidaysFurikyu)) {
+      updates.holidaysFurikyu = data.holidaysFurikyu.filter((date: string) => date >= threshold);
+    }
+    if (data.holidaysDaikyu && Array.isArray(data.holidaysDaikyu)) {
+      updates.holidaysDaikyu = data.holidaysDaikyu.filter((date: string) => date >= threshold);
+    }
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "staff", staffDoc.id), updates);
     }
   }
   return NextResponse.json({ message: "Old holiday data cleared" });

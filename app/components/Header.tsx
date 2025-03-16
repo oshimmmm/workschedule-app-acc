@@ -1,17 +1,41 @@
 // components/Header.tsx
-import Link from 'next/link';
+import Link from "next/link";
 
 export default function Header() {
   return (
-    <header style={{ padding: '1rem', borderBottom: '1px solid #ccc' }}>
-      <nav>
-        <ul style={{ display: 'flex', gap: '1rem', listStyle: 'none', padding: 0 }}>
-          <li><Link href="/">作成</Link></li>
-          <li><Link href="/position-edit">ポジション編集</Link></li>
-          <li><Link href="/staff-edit">スタッフ編集</Link></li>
-          <li><Link href="/holiday-edit">休み編集</Link></li>
-          <li><Link href="/blood-edit">採血者編集</Link></li>
-          <li><Link href="/staff-list">スタッフリスト</Link></li>
+    <header className="bg-gray-200 shadow-md">
+      <nav className="max-w-7xl mx-auto px-4 py-4">
+        <ul className="flex items-center space-x-6">
+          <li>
+            <Link href="/" className="text-gray-700 hover:text-blue-500 font-medium">
+              作成
+            </Link>
+          </li>
+          <li>
+            <Link href="/position-edit" className="text-gray-700 hover:text-blue-500 font-medium">
+              ポジション編集
+            </Link>
+          </li>
+          <li>
+            <Link href="/staff-edit" className="text-gray-700 hover:text-blue-500 font-medium">
+              スタッフ編集
+            </Link>
+          </li>
+          <li>
+            <Link href="/holiday-edit" className="text-gray-700 hover:text-blue-500 font-medium">
+              休み編集
+            </Link>
+          </li>
+          {/* <li>
+            <Link href="/blood-edit" className="text-gray-700 hover:text-blue-500 font-medium">
+              採血者編集
+            </Link>
+          </li> */}
+          <li>
+            <Link href="/staff-list" className="text-gray-700 hover:text-blue-500 font-medium">
+              スタッフリスト
+            </Link>
+          </li>
         </ul>
       </nav>
     </header>
