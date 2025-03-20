@@ -8,7 +8,12 @@ export default function Header() {
         <ul className="flex items-center space-x-6">
           <li>
             <Link href="/" className="text-gray-700 hover:text-blue-500 font-medium">
-              作成
+              部門用作成
+            </Link>
+          </li>
+          <li>
+            <Link href="/nightShift" className="text-gray-700 hover:text-blue-500 font-medium">
+              夜勤用作成
             </Link>
           </li>
           <li>

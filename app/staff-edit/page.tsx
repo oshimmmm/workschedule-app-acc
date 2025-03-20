@@ -7,6 +7,7 @@ interface Staff {
   name: string;
   departments: string[]; // 複数の部門情報を保持する
   availablePositions: string[]; // 選択されたポジション名の配列
+  experience: number;
 }
 
 interface PositionOption {
@@ -19,11 +20,12 @@ export default function StaffEditPage() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [positionOptions, setPositionOptions] = useState<PositionOption[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // フォームの初期値：部門は空配列
+  // 初期値は各項目に1つの空文字（動的入力用）
   const [formData, setFormData] = useState<Staff>({
     name: "",
-    departments: [],
+    departments: [""],
     availablePositions: [""],
+    experience: 0,
   });
   // 部門フィルター用の状態（選択されていない場合は空文字＝全体表示）
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
@@ -72,7 +74,7 @@ export default function StaffEditPage() {
     const cleanedPositions = formData.availablePositions.filter(
       (pos) => pos.trim() !== ""
     );
-    // 部門もカンマ区切りの入力欄から配列へ変換（例として）
+    // departmentsの空文字も除外
     const cleanedDepartments = formData.departments
       .map((d) => d.trim())
       .filter((d) => d !== "");
@@ -113,33 +115,35 @@ export default function StaffEditPage() {
     setEditingId(null);
     setFormData({
       name: "",
-      departments: [],
+      departments: [""],
       availablePositions: [""],
+      experience: 0,
     });
   };
 
   // スタッフ一覧から編集対象を選択
   const handleEdit = (staff: Staff) => {
     setEditingId(staff.id || null);
-    // 編集時は、既存の配列をそのまま設定
     setFormData({
       name: staff.name,
-      departments: staff.departments,
+      departments: staff.departments.length > 0 ? [...staff.departments, ""] : [""],
       availablePositions:
         staff.availablePositions.length > 0
           ? [...staff.availablePositions, ""]
           : [""],
+      experience: staff.experience,
     });
-    // 編集対象が選択されたら、ヘッダーにスクロール
     headerRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // 部門（複数入力）の変更は、カンマ区切りで入力する例
-  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // ユーザーは「病理,外科,総合」といった文字列を入力する想定
-    const input = e.target.value;
-    const departments = input.split(",").map((d) => d.trim()).filter((d) => d !== "");
-    setFormData({ ...formData, departments });
+  // 部門入力欄の変更処理（動的入力）
+  const handleDepartmentChange = (index: number, value: string) => {
+    const newDepartments = [...formData.departments];
+    newDepartments[index] = value;
+    if (index === newDepartments.length - 1 && value.trim() !== "") {
+      newDepartments.push("");
+    }
+    setFormData({ ...formData, departments: newDepartments });
   };
 
   // プルダウンの値変更処理（配置可能ポジション部分）
@@ -190,16 +194,37 @@ export default function StaffEditPage() {
             className="w-full p-2 border border-gray-300 rounded"
           />
         </div>
+
         <div>
-          <label className="block mb-1">配属先（複数の場合はカンマ区切り）:</label>
+          <label className="block mb-1">経験年数:</label>
           <input
-            type="text"
-            value={formData.departments.join(", ")}
-            onChange={handleDepartmentChange}
+            type="number"
+            value={formData.experience}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                experience: Number(e.target.value),
+              })
+            }
             required
-            placeholder="例: 病理,外科"
             className="w-full p-2 border border-gray-300 rounded"
           />
+        </div>
+
+        <div>
+          <label className="block mb-1">配属先:</label>
+          <div className="space-y-2">
+            {formData.departments.map((department, index) => (
+              <input
+                key={index}
+                type="text"
+                value={department}
+                onChange={(e) => handleDepartmentChange(index, e.target.value)}
+                placeholder="例: 病理"
+                className="w-full p-2 border border-gray-300 rounded"
+              />
+            ))}
+          </div>
         </div>
         <div>
           <label className="block mb-1">配置可能ポジション:</label>
