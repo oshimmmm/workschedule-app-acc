@@ -31,6 +31,11 @@ export default function Header() {
               休み編集
             </Link>
           </li>
+          <li>
+            <Link href="/nightShift-edit" className="text-gray-700 hover:text-blue-500 font-medium">
+              日当直情報編集
+            </Link>
+          </li>
           {/* <li>
             <Link href="/blood-edit" className="text-gray-700 hover:text-blue-500 font-medium">
               採血者編集

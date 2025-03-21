@@ -1,7 +1,7 @@
 // app/api/night/route.ts
 import { NextResponse } from "next/server";
 import db from "../../../firebase/db";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, arrayUnion } from "firebase/firestore";
 import ExcelJS from "exceljs";
 import { format, addDays, differenceInCalendarDays } from "date-fns";
 
@@ -151,7 +151,7 @@ async function assignNightShift(
       `[${formatDateLocal(date)}] Position: ${pos.name} - Candidate departments and counters:`,
       candidateInfo
     );
-  
+
     if (candidateInfo.length === 0) {
       console.log(`[${formatDateLocal(date)}] Position: ${pos.name} - No candidate department available`);
       assignments[pos.id] = "未配置";
@@ -163,7 +163,7 @@ async function assignNightShift(
     const minCandidates = candidateInfo.filter(info => info.count === minCountValue);
     const chosenDeptInfo = minCandidates[Math.floor(Math.random() * minCandidates.length)];
     selectedDept = chosenDeptInfo.dept;
-  
+
     // 部門カウンター更新：生理は+1、輸血は+3、その他は+2
     const deptKey = nextDayIsHoliday ? `休日前${pos.name}|${selectedDept}` : `${pos.name}|${selectedDept}`;
     const increment = selectedDept === "生理" ? 1 : (selectedDept === "輸血" ? 3 : 2);
@@ -177,7 +177,7 @@ async function assignNightShift(
     console.log(
       `[${formatDateLocal(date)}] Position: ${pos.name} - Updated counter for ${deptKey}: ${counters.get(deptKey)}`
     );
-  
+
     // eligibleStaff：該当部門と、さらに配置するポジション名 (pos.name) を departments に持つスタッフ
     const eligibleStaff = staffList.filter((staff) => {
       if (!(staff.departments || []).includes(selectedDept!)) return false;
@@ -210,9 +210,13 @@ async function assignNightShift(
         `[${formatDateLocal(date)}] Position: ${pos.name} - Updated staff counter for ${chosenStaffInfo.key}: ${staffCounters.get(chosenStaffInfo.key)}`
       );
       assignments[pos.id] = selectedStaff.name;
+      // ★ 追加：更新対象のスタッフドキュメントの、該当ポジション名フィールドに日付を追加
+      await updateDoc(doc(db, "staff", selectedStaff.id), {
+        [pos.name]: arrayUnion(formatDateLocal(date))
+      });
     }
   }
-  
+
   console.log("Night shift assignments:", assignments);
   return assignments;
 }
@@ -224,120 +228,123 @@ async function assignNightShift(
  * スタッフ選定は、まず該当部門を持ち、さらに配置するポジション名 (pos.name) を departments に持つスタッフからランダムに選択
  */
 async function assignNichokuShift(
-    date: Date,
-    positions: PositionData[],
-    staffList: StaffData[],
-    counters: Map<string, number>,
-    staffCounters: Map<string, number>,
-    staffLastAssigned: Map<string, Date>
-  ): Promise<{ [posId: string]: string }> {
-    const assignments: { [posId: string]: string } = {};
-    
-    for (const pos of positions) {
-      let selectedDept: string | null = null;
-      const candidateInfo: { dept: string; key: string; count: number }[] = [];
-      // 日直用候補部門は、スタッフの departments から「二交代」「待機」以外の部門を抽出
-      // ただし、ここでは"日直主"の場合は ["病理", "輸血", "生化学", "血液"]、"日直副"の場合は ["生理", "病理"] のみ許可する
-      const candidateDepts = new Set<string>();
-      staffList.forEach((staff) => {
-        if (staff.departments && (staff.departments.includes("二交代") || staff.departments.includes("待機"))) {
-          staff.departments.forEach((dept) => {
-            // "日直主"・"日直副"は除外
-            if (dept === "日直主" || dept === "日直副") return;
-            if (dept !== "二交代" && dept !== "待機") {
-              candidateDepts.add(dept);
-            }
-          });
-        }
-      });
-      
-      // 許可する部門を pos.name により決定
-      let allowedDepts: string[] = [];
-      if (pos.name === "日直副") {
-        allowedDepts = ["生理", "病理"];
-      } else if (pos.name === "日直主") {
-        allowedDepts = ["病理", "輸血", "生化学", "血液"];
-      } else {
-        allowedDepts = Array.from(candidateDepts);
-      }
-    
-      // 候補部門から、allowedDepts に含まれるもののみを candidateInfo に追加
-      candidateDepts.forEach((dept) => {
-        if (!allowedDepts.includes(dept)) return;
-        const key = `${pos.name}|${dept}|`;
-        const count = counters.get(key) || 0;
-        candidateInfo.push({ dept, key, count });
-      });
-    
-      console.log(
-        `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Candidate departments and counters:`,
-        candidateInfo
-      );
-      if (candidateInfo.length === 0) {
-        console.log(`[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - No candidate department available`);
-        assignments[pos.id] = "未配置";
-        continue;
-      }
-      const counts = candidateInfo.map(info => info.count);
-      const minCountValue = Math.min(...counts);
-      const minCandidates = candidateInfo.filter(info => info.count === minCountValue);
-      const chosenDeptInfo = minCandidates[Math.floor(Math.random() * minCandidates.length)];
-      selectedDept = chosenDeptInfo.dept;
-    
-      // 日直用部門カウンター更新（キー："ポジション名|部門名|"）
-      const deptKey = `${pos.name}|${selectedDept}|`;
-      let increment: number;
-      if (selectedDept === "生理") {
-        increment = 1;
-      } else if (pos.name === "日直副" && selectedDept === "病理") {
-        increment = 4;
-      } else if (selectedDept === "輸血") {
-        increment = 3;
-      } else {
-        increment = 2;
-      }
-      counters.set(deptKey, (counters.get(deptKey) || 0) + increment);
-      console.log(
-        `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Selected department: ${selectedDept}`
-      );
-      console.log(
-        `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Updated counter for ${deptKey}: ${counters.get(deptKey)}`
-      );
-    
-      // eligibleStaff：まず、selectedDept と配置するポジション名 (pos.name) の両方を持つスタッフを抽出
-      let eligibleStaff = staffList.filter((staff) =>
-        (staff.departments || []).includes(selectedDept!) && (staff.departments || []).includes(pos.name)
-      );
-      if (eligibleStaff.length === 0) {
-        console.log(`[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - No eligible staff available for department ${selectedDept}`);
-        assignments[pos.id] = "未配置";
-      } else {
-        const candidateStaffInfo: { staff: StaffData; key: string; count: number }[] = [];
-        eligibleStaff.forEach((staff) => {
-          const staffKey = `${selectedDept}|${staff.id}`;
-          const count = staffCounters.get(staffKey) || 0;
-          candidateStaffInfo.push({ staff, key: staffKey, count });
-        });
-        const staffCounts = candidateStaffInfo.map(info => info.count);
-        const minStaffCount = Math.min(...staffCounts);
-        const minStaffCandidates = candidateStaffInfo.filter(info => info.count === minStaffCount);
-        const chosenStaffInfo = minStaffCandidates[Math.floor(Math.random() * minStaffCandidates.length)];
-        const selectedStaff = chosenStaffInfo.staff;
-        staffCounters.set(chosenStaffInfo.key, (staffCounters.get(chosenStaffInfo.key) || 0) + 1);
-        staffLastAssigned.set(selectedStaff.id, date);
-        console.log(
-          `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Selected staff from ${selectedDept}: ${selectedStaff.name}`
-        );
-        console.log(
-          `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Updated staff counter for ${chosenStaffInfo.key}: ${staffCounters.get(chosenStaffInfo.key)}`
-        );
-        assignments[pos.id] = selectedStaff.name;
-      }
-    }
-    console.log("Nichoku assignments:", assignments);
-    return assignments;
-  }
+  date: Date,
+  positions: PositionData[],
+  staffList: StaffData[],
+  counters: Map<string, number>,
+  staffCounters: Map<string, number>,
+  staffLastAssigned: Map<string, Date>
+): Promise<{ [posId: string]: string }> {
+  const assignments: { [posId: string]: string } = {};
   
+  for (const pos of positions) {
+    let selectedDept: string | null = null;
+    const candidateInfo: { dept: string; key: string; count: number }[] = [];
+    // 日直用候補部門は、スタッフの departments から「二交代」「待機」以外の部門を抽出
+    // ただし、ここでは"日直主"の場合は ["病理", "輸血", "生化学", "血液"]、"日直副"の場合は ["生理", "病理"] のみ許可する
+    const candidateDepts = new Set<string>();
+    staffList.forEach((staff) => {
+      if (staff.departments && (staff.departments.includes("二交代") || staff.departments.includes("待機"))) {
+        staff.departments.forEach((dept) => {
+          // "日直主"・"日直副"は除外
+          if (dept === "日直主" || dept === "日直副") return;
+          if (dept !== "二交代" && dept !== "待機") {
+            candidateDepts.add(dept);
+          }
+        });
+      }
+    });
+    
+    // 許可する部門を pos.name により決定
+    let allowedDepts: string[] = [];
+    if (pos.name === "日直副") {
+      allowedDepts = ["生理", "病理"];
+    } else if (pos.name === "日直主") {
+      allowedDepts = ["病理", "輸血", "生化学", "血液"];
+    } else {
+      allowedDepts = Array.from(candidateDepts);
+    }
+  
+    // 候補部門から、allowedDepts に含まれるもののみを candidateInfo に追加
+    candidateDepts.forEach((dept) => {
+      if (!allowedDepts.includes(dept)) return;
+      const key = `${pos.name}|${dept}|`;
+      const count = counters.get(key) || 0;
+      candidateInfo.push({ dept, key, count });
+    });
+  
+    console.log(
+      `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Candidate departments and counters:`,
+      candidateInfo
+    );
+    if (candidateInfo.length === 0) {
+      console.log(`[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - No candidate department available`);
+      assignments[pos.id] = "未配置";
+      continue;
+    }
+    const counts = candidateInfo.map(info => info.count);
+    const minCountValue = Math.min(...counts);
+    const minCandidates = candidateInfo.filter(info => info.count === minCountValue);
+    const chosenDeptInfo = minCandidates[Math.floor(Math.random() * minCandidates.length)];
+    selectedDept = chosenDeptInfo.dept;
+  
+    // 日直用部門カウンター更新（キー："ポジション名|部門名|"）
+    const deptKey = `${pos.name}|${selectedDept}|`;
+    let increment: number;
+    if (selectedDept === "生理") {
+      increment = 1;
+    } else if (pos.name === "日直副" && selectedDept === "病理") {
+      increment = 4; // こちらで+3ではなく+4と指定されています
+    } else if (selectedDept === "輸血") {
+      increment = 3;
+    } else {
+      increment = 2;
+    }
+    counters.set(deptKey, (counters.get(deptKey) || 0) + increment);
+    console.log(
+      `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Selected department: ${selectedDept}`
+    );
+    console.log(
+      `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Updated counter for ${deptKey}: ${counters.get(deptKey)}`
+    );
+  
+    // eligibleStaff：まず、selectedDept と配置するポジション名 (pos.name) の両方を持つスタッフを抽出
+    let eligibleStaff = staffList.filter((staff) =>
+      (staff.departments || []).includes(selectedDept!) && (staff.departments || []).includes(pos.name)
+    );
+    if (eligibleStaff.length === 0) {
+      console.log(`[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - No eligible staff available for department ${selectedDept}`);
+      assignments[pos.id] = "未配置";
+    } else {
+      const candidateStaffInfo: { staff: StaffData; key: string; count: number }[] = [];
+      eligibleStaff.forEach((staff) => {
+        const staffKey = `${selectedDept}|${staff.id}`;
+        const count = staffCounters.get(staffKey) || 0;
+        candidateStaffInfo.push({ staff, key: staffKey, count });
+      });
+      const staffCounts = candidateStaffInfo.map(info => info.count);
+      const minStaffCount = Math.min(...staffCounts);
+      const minStaffCandidates = candidateStaffInfo.filter(info => info.count === minStaffCount);
+      const chosenStaffInfo = minStaffCandidates[Math.floor(Math.random() * minStaffCandidates.length)];
+      const selectedStaff = chosenStaffInfo.staff;
+      staffCounters.set(chosenStaffInfo.key, (staffCounters.get(chosenStaffInfo.key) || 0) + 1);
+      staffLastAssigned.set(selectedStaff.id, date);
+      console.log(
+        `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Selected staff from ${selectedDept}: ${selectedStaff.name}`
+      );
+      console.log(
+        `[${formatDateLocal(date)}] Nichoku Position: ${pos.name} - Updated staff counter for ${chosenStaffInfo.key}: ${staffCounters.get(chosenStaffInfo.key)}`
+      );
+      assignments[pos.id] = selectedStaff.name;
+      // ★ 追加：Firestore の対象スタッフドキュメントの、該当ポジションフィールドに日付を追加
+      await updateDoc(doc(db, "staff", selectedStaff.id), {
+        [pos.name]: arrayUnion(formatDateLocal(date))
+      });
+    }
+  }
+  console.log("Nichoku assignments:", assignments);
+  return assignments;
+}
 
 export async function POST(request: Request) {
   // リクエストボディから開始月と終了月を取得（例："2025-01", "2025-03"）
