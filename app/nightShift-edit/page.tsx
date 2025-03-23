@@ -4,6 +4,23 @@ import Select from "react-select";
 import { format, startOfMonth, endOfMonth, addDays, getDay } from "date-fns";
 import { Box, Button, TextField, Typography } from "@mui/material";
 
+// 外部APIから日本の祝日情報を取得する関数
+async function getJapaneseHolidays(year: number, month: number): Promise<string[]> {
+  try {
+    const res = await fetch("https://holidays-jp.github.io/api/v1/date.json");
+    if (!res.ok) {
+      console.error("祝日API取得エラー", res.statusText);
+      return [];
+    }
+    const data: Record<string, string> = await res.json();
+    const keyPrefix = `${year}-${month.toString().padStart(2, "0")}`;
+    return Object.keys(data).filter((date) => date.startsWith(keyPrefix));
+  } catch (error) {
+    console.error("祝日API取得例外", error);
+    return [];
+  }
+}
+
 interface StaffOption {
   id: string;
   name: string;
@@ -28,9 +45,11 @@ interface DayCellProps {
   shiftData?: ShiftDataEntry;
   staffOptions: StaffOption[];
   onChange: (type: NightShiftType, values: string[]) => void;
+  // 当該月の祝日（"yyyy-MM-dd"形式の文字列リスト）
+  holidays: string[];
 }
 
-const DayCell: React.FC<DayCellProps> = ({ date, shiftData, staffOptions, onChange }) => {
+const DayCell: React.FC<DayCellProps> = ({ date, shiftData, staffOptions, onChange, holidays }) => {
   if (!date) {
     return (
       <Box
@@ -45,6 +64,20 @@ const DayCell: React.FC<DayCellProps> = ({ date, shiftData, staffOptions, onChan
     );
   }
 
+  // 休日判定: APIで取得した祝日リストに含まれる日付、または
+  // 振替休日: 月曜日で、前日（日曜日）が祝日だった場合
+  const isHoliday = (date: Date): boolean => {
+    const formatted = format(date, "yyyy-MM-dd");
+    if (holidays.includes(formatted)) return true;
+    if (date.getDay() === 1) { // 月曜日の場合
+      const yesterday = addDays(date, -1);
+      const formattedYesterday = format(yesterday, "yyyy-MM-dd");
+      if (yesterday.getDay() === 0 && holidays.includes(formattedYesterday)) return true;
+    }
+    return false;
+  };
+
+  const showAllShifts = isHoliday(date);
   const dayLabel = format(date, "d");
   const selectOptions = staffOptions.map((s) => ({ value: s.id, label: s.name }));
 
@@ -87,8 +120,8 @@ const DayCell: React.FC<DayCellProps> = ({ date, shiftData, staffOptions, onChan
       </Typography>
       {renderSelect("待機", "待機")}
       {renderSelect("二交代", "二交代")}
-      {renderSelect("日直主", "日直主")}
-      {renderSelect("日直副", "日直副")}
+      {showAllShifts && renderSelect("日直主", "日直主")}
+      {showAllShifts && renderSelect("日直副", "日直副")}
     </Box>
   );
 };
@@ -102,17 +135,23 @@ export default function NightShiftEditPage() {
   const [originalShiftData, setOriginalShiftData] = useState<ShiftData>({});
   const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  // 当該月の祝日情報（"yyyy-MM-dd"形式）
+  const [holidays, setHolidays] = useState<string[]>([]);
 
   useEffect(() => {
     generateCalendar(selectedMonth);
     loadShiftData(selectedMonth);
+    // selectedMonth を分解して祝日情報を取得
+    const [yearStr, monthStr] = selectedMonth.split("-");
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    getJapaneseHolidays(year, month).then(setHolidays);
   }, [selectedMonth]);
 
   useEffect(() => {
     fetchStaffOptions();
   }, []);
 
-  // 対象月のカレンダー（週ごとにDateまたはnullの配列）を生成
   const generateCalendar = (monthStr: string) => {
     const [year, month] = monthStr.split("-").map(Number);
     const firstDay = startOfMonth(new Date(year, month - 1));
@@ -136,7 +175,6 @@ export default function NightShiftEditPage() {
     setCalendarWeeks(weeks);
   };
 
-  // スタッフ情報の取得
   const fetchStaffOptions = async () => {
     const res = await fetch("/api/staff");
     if (res.ok) {
@@ -145,7 +183,6 @@ export default function NightShiftEditPage() {
     }
   };
 
-  // 夜勤シフトデータの取得（対象月指定）
   const loadShiftData = async (month: string) => {
     const res = await fetch(`/api/nightEdit?month=${month}`);
     if (res.ok) {
@@ -157,16 +194,15 @@ export default function NightShiftEditPage() {
   };
 
   const handleConfirm = async () => {
-    // 例: shiftData の変更差分を計算して更新する
     const updates: {
       date: string;
-      addTai: string[]; // 「待機」の追加
+      addTai: string[];
       removeTai: string[];
-      addNikutai: string[]; // 「二交代」
+      addNikutai: string[];
       removeNikutai: string[];
-      addNichokuShu: string[]; // 「日直主」
+      addNichokuShu: string[];
       removeNichokuShu: string[];
-      addNichokuFuku: string[]; // 「日直副」
+      addNichokuFuku: string[];
       removeNichokuFuku: string[];
     }[] = [];
 
@@ -229,7 +265,6 @@ export default function NightShiftEditPage() {
     }
   };
 
-  // 部門フィルターによるスタッフ絞り込み
   const filteredStaffOptions = useMemo(() => {
     if (!selectedDepartment) return staffOptions;
     return staffOptions.filter((s) =>
@@ -237,7 +272,6 @@ export default function NightShiftEditPage() {
     );
   }, [staffOptions, selectedDepartment]);
 
-  // 各日ごとのシフトデータ更新
   const handleDayChange = (date: Date, type: NightShiftType, values: string[]) => {
     const dateStr = format(date, "yyyy-MM-dd");
     setShiftData((prev) => ({
@@ -249,17 +283,19 @@ export default function NightShiftEditPage() {
     }));
   };
 
-  // スタッフ情報から一意の部門一覧を生成
   const departmentOptions = useMemo(() => {
     const depts = staffOptions.flatMap((s) => s.departments || []);
     return Array.from(new Set(depts));
   }, [staffOptions]);
 
-  // 古いシフトデータをクリアする処理（例：2年以上前のデータ削除 API）
   const handleClear = async () => {
-    const res = await fetch("/api/nightEdit/clear", { method: "POST" });
+    const res = await fetch("/api/nightEdit/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ month: selectedMonth }),
+    });
     if (res.ok) {
-      alert("2年以上前の夜勤シフトデータがクリアされました");
+      alert("この月の夜勤シフトデータがクリアされました");
       loadShiftData(selectedMonth);
     } else {
       alert("夜勤シフトデータのクリアに失敗しました");
@@ -319,6 +355,7 @@ export default function NightShiftEditPage() {
               }
               staffOptions={filteredStaffOptions}
               onChange={(type, values) => date && handleDayChange(date, type, values)}
+              holidays={holidays}
             />
           ))
         )}

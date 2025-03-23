@@ -52,6 +52,10 @@ export default function StaffEditPage() {
     }
   };
 
+  const filteredPositionOptions = selectedDepartment
+  ? positionOptions.filter((option) => option.departments && option.departments.includes(selectedDepartment))
+  : positionOptions;
+
   // APIからポジション情報を取得（departments情報も含む）
   const fetchPositions = async () => {
     const res = await fetch("/api/positions");
@@ -125,6 +129,7 @@ export default function StaffEditPage() {
   const handleEdit = (staff: Staff) => {
     setEditingId(staff.id || null);
     setFormData({
+      id: staff.id,
       name: staff.name,
       departments: staff.departments.length > 0 ? [...staff.departments, ""] : [""],
       availablePositions:
@@ -134,6 +139,46 @@ export default function StaffEditPage() {
       experience: staff.experience,
     });
     headerRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleDeleteFromForm = async () => {
+    if (!formData.id) return; // IDが無ければ削除できない
+    const confirmDelete = confirm(`スタッフ「${formData.name}」を削除してよろしいですか？`);
+    if (!confirmDelete) return;
+  
+    const res = await fetch("/api/staff", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: formData.id }),
+    });
+    if (res.ok) {
+      await fetchStaff();
+      resetForm(); // フォームをクリア
+    } else {
+      alert("削除に失敗しました。");
+    }
+  };
+
+  const handleDeleteItem = async (staff: Staff) => {
+    if (!staff.id) return;
+    const confirmDelete = confirm(`スタッフ「${staff.name}」を削除してよろしいですか？`);
+    if (!confirmDelete) return;
+  
+    const res = await fetch("/api/staff", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: staff.id }),
+    });
+    if (res.ok) {
+      // 一覧を更新
+      await fetchStaff();
+      // もし今まさに編集中だった場合はフォームをクリア
+      if (editingId === staff.id) {
+        resetForm();
+      }
+    } else {
+      alert("削除に失敗しました。");
+    }
   };
 
   // 部門入力欄の変更処理（動的入力）
@@ -196,7 +241,7 @@ export default function StaffEditPage() {
         </div>
 
         <div>
-          <label className="block mb-1">経験年数:</label>
+          <label className="block mb-1">経験年数:　夜勤の組み合わせで使用します</label>
           <input
             type="number"
             value={formData.experience}
@@ -212,7 +257,7 @@ export default function StaffEditPage() {
         </div>
 
         <div>
-          <label className="block mb-1">配属先:</label>
+          <label className="block mb-1">配属先:　二交代や待機、日直主あるいは日直副も入れるようになったら登録してください</label>
           <div className="space-y-2">
             {formData.departments.map((department, index) => (
               <input
@@ -237,7 +282,7 @@ export default function StaffEditPage() {
                 className="w-full p-2 border border-gray-300 rounded"
               >
                 <option value="">選択してください</option>
-                {positionOptions.map((option) => (
+                {filteredPositionOptions.map((option) => (
                   <option key={option.id} value={option.name}>
                     {option.name}
                   </option>
@@ -254,13 +299,22 @@ export default function StaffEditPage() {
             {editingId ? "更新" : "登録"}
           </button>
           {editingId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
-              クリア
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                クリア
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteFromForm}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                削除
+              </button>
+            </>
           )}
         </div>
       </form>
@@ -270,17 +324,28 @@ export default function StaffEditPage() {
         {filteredStaff.map((staff) => (
           <li
             key={staff.id}
-            onClick={() => handleEdit(staff)}
             className="cursor-pointer border border-gray-300 p-2 rounded hover:bg-gray-100"
           >
-            <div className="font-bold">{staff.name}</div>
-            <div>配属先: {(staff.departments || []).join(", ")}</div>
-            <div>
-              配置可能ポジション:{" "}
-              {(staff.availablePositions || [])
-                .filter((p) => p.trim() !== "")
-                .join(", ")}
+            <div onClick={() => handleEdit(staff)}>
+              <div className="font-bold">{staff.name}</div>
+              <div>配属先: {(staff.departments || []).join(", ")}</div>
+              <div>
+                配置可能ポジション:{" "}
+                {(staff.availablePositions || [])
+                  .filter((p) => p.trim() !== "")
+                  .join(", ")}
+              </div>
             </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // 親要素の onClick（handleEdit）を阻止
+                handleDeleteItem(staff);
+              }}
+              className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+            >
+              削除
+            </button>
+            
           </li>
         ))}
       </ul>

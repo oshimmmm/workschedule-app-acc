@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import db from "../../../firebase/db";
 import { collection, getDocs, updateDoc, doc, arrayUnion } from "firebase/firestore";
 import ExcelJS from "exceljs";
-import { format, addDays, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 
 interface PositionData {
   id: string;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "../../../firebase/db";
-import { doc, updateDoc, arrayUnion, arrayRemove, collection, getDocs } from "firebase/firestore";
+import { doc, updateDoc, arrayUnion, collection, getDocs } from "firebase/firestore";
 
 // GET: 指定月の休み情報を集約して取得（有休、振休、代休それぞれのフィールド）
 export async function GET(request: Request) {

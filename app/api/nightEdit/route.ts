@@ -3,37 +3,74 @@ import { NextResponse } from "next/server";
 import db from "../../../firebase/db";
 import { collection, getDocs } from "firebase/firestore";
 
-// GETリクエストで staff コレクションの各ドキュメントから
-// 「待機」「二交代」「日直主」「日直副」の各フィールドを集計し、
-// 各日付ごとにどのスタッフが割り当てられているかのマッピングを作成して返す
+// シフトフィールドとして扱うキーのリテラル型
+type ShiftType = "待機" | "二交代" | "日直主" | "日直副";
+// 対象のシフトフィールドを明示的に指定した配列
+const shiftTypes: ShiftType[] = ["待機", "二交代", "日直主", "日直副"];
 
-export async function GET() {
-  // Firestoreの staff コレクションからすべてのドキュメントを取得
-  const staffSnapshot = await getDocs(collection(db, "staff"));
+// 各日付ごとのシフト情報の型
+interface ShiftDataEntry {
+  待機: string[];
+  二交代: string[];
+  日直主: string[];
+  日直副: string[];
+}
+// API のレスポンスとして返すシフトデータの型
+interface ShiftData {
+  [date: string]: ShiftDataEntry;
+}
 
-  // 結果の型：各フィールドごとに、キーが日付、値がスタッフ名の配列
-  const result: Record<string, Record<string, string[]>> = {
-    待機: {},
-    二交代: {},
-    日直主: {},
-    日直副: {},
-  };
+export async function GET(request: Request) {
+  // クエリパラメータから対象月を取得（例："2025-04"）
+  const { searchParams } = new URL(request.url);
+  const month = searchParams.get("month");
 
-  staffSnapshot.docs.forEach((doc) => {
-    const data = doc.data();
-    const staffName = data.name;
-    // 対象フィールドをループ
-    ["待機", "二交代", "日直主", "日直副"].forEach((field) => {
-      // もしフィールドが存在しなければスキップ
-      const dates: string[] = data[field] || [];
-      dates.forEach((dateStr) => {
-        if (!result[field][dateStr]) {
-          result[field][dateStr] = [];
+  // 結果を保持するオブジェクトの初期化
+  const shiftData: ShiftData = {};
+
+  try {
+    // staff コレクションの全ドキュメントを取得
+    const staffSnapshot = await getDocs(collection(db, "staff"));
+
+    staffSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const staffId = doc.id;
+      // 各シフトフィールドについてループ
+      shiftTypes.forEach((shiftType) => {
+        const dates = data[shiftType];
+        // dates が配列であることを確認
+        if (Array.isArray(dates)) {
+          dates.forEach((dateValue: any) => {
+            // 例: dateValue は "2025-04-22" のような文字列であることを想定
+            // クエリパラメータ month がある場合は、対象月以外はスキップ
+            if (month && !dateValue.startsWith(month)) {
+              return;
+            }
+            // 対象の日付キーがまだなければ初期化
+            if (!shiftData[dateValue]) {
+              shiftData[dateValue] = {
+                待機: [],
+                二交代: [],
+                日直主: [],
+                日直副: [],
+              };
+            }
+            // 重複しないようにスタッフIDを追加
+            if (!shiftData[dateValue][shiftType].includes(staffId)) {
+              shiftData[dateValue][shiftType].push(staffId);
+            }
+          });
         }
-        result[field][dateStr].push(staffName);
       });
     });
-  });
 
-  return NextResponse.json(result);
+    // JSON としてレスポンスを返す
+    return NextResponse.json(shiftData);
+  } catch (error) {
+    console.error("夜勤シフトデータ取得エラー:", error);
+    return NextResponse.json(
+      { error: "シフトデータの取得に失敗しました" },
+      { status: 500 }
+    );
+  }
 }

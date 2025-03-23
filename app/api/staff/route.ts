@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   doc,
+  deleteDoc,
 } from "firebase/firestore";
 
 // GET: 登録済みのポジション情報一覧を取得
@@ -36,4 +37,16 @@ export async function PUT(request: Request) {
   const posRef = doc(db, "staff", id);
   await updateDoc(posRef, data);
   return NextResponse.json({ id, ...data });
+}
+
+// DELETE: 登録済スタッフの削除
+export async function DELETE(request: Request) {
+  const body = await request.json();
+  const { id } = body;
+  if (!id) {
+    return NextResponse.json({ error: "ID が必要です" }, { status: 400 });
+  }
+  const staffRef = doc(db, "staff", id);
+  await deleteDoc(staffRef);
+  return NextResponse.json({ success: true });
 }

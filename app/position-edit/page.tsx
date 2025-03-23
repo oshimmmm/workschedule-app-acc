@@ -1,7 +1,7 @@
-// app/position-edit/page.tsx
 "use client";
 import { useState, useEffect, useRef } from "react";
 
+// Positionインターフェースに新規フィールドを追加
 interface Position {
   id?: string;
   name: string;
@@ -10,12 +10,15 @@ interface Position {
   required: boolean;
   sameStaffWeekly: boolean;
   allowMultiple: boolean;
+  staffSeveral: boolean;
+  horidayToday: boolean;    // 当日休みフラグ
+  horidayTomorrow: boolean; // 翌日休みフラグ
   departments?: string[];
 }
 
 export default function PositionEditPage() {
   const [positions, setPositions] = useState<Position[]>([]);
-  // 部門フィルター用（"新規登録" を選択すると、CellSelectorには何も表示しない）
+  // 部門フィルター用（"新規登録" を選択するとCellSelectorには何も表示しない）
   const [selectedDepartment, setSelectedDepartment] = useState<string>("新規登録");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Position>({
@@ -25,6 +28,9 @@ export default function PositionEditPage() {
     required: false,
     sameStaffWeekly: false,
     allowMultiple: false,
+    staffSeveral: false,
+    horidayToday: false,    // 初期値 false
+    horidayTomorrow: false, // 初期値 false
     departments: [],
   });
   // プレビュー用に現在の月を数値で保持（例：4なら4月）
@@ -49,8 +55,19 @@ export default function PositionEditPage() {
     setPositions(updatedPositions);
   };
 
-  const handleCellSelect = (cell: string) => {
-    setFormData({ ...formData, outputCell: cell });
+  /**
+   * セルがクリックされたときの処理
+   * - 既にポジションが割り当てられていれば handleEdit(pos) で編集開始
+   * - まだ割り当てが無ければ、outputCell のみを更新（新規登録用）
+   */
+  const handleCellSelect = (pos: Position | null, cell?: string) => {
+    if (pos) {
+      // 既存のポジションを編集
+      handleEdit(pos);
+    } else if (cell) {
+      // 新規割り当て（outputCell のみ更新）
+      setFormData((prev) => ({ ...prev, outputCell: cell }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,6 +88,9 @@ export default function PositionEditPage() {
           required: false,
           sameStaffWeekly: false,
           allowMultiple: false,
+          staffSeveral: false,
+          horidayToday: false,
+          horidayTomorrow: false,
           departments: [],
         });
       }
@@ -90,16 +110,56 @@ export default function PositionEditPage() {
           required: false,
           sameStaffWeekly: false,
           allowMultiple: false,
+          staffSeveral: false,
+          horidayToday: false,
+          horidayTomorrow: false,
           departments: [],
         });
       }
     }
   };
 
+  /**
+   * 既存ポジションの編集時にフォームへ反映させる。
+   * ここですべての項目にデフォルト値を付与し、uncontrolled → controlled を防ぐ。
+   */
   const handleEdit = (pos: Position) => {
-    setEditingId(pos.id || null);
-    setFormData(pos);
+    const newEditingId = pos.id || null;
+    setEditingId(newEditingId);
+    setFormData({
+      id: pos.id,
+      name: pos.name || "",
+      outputCell: pos.outputCell || "",
+      priority: pos.priority !== undefined ? pos.priority : 1,
+      required: pos.required !== undefined ? pos.required : false,
+      sameStaffWeekly: pos.sameStaffWeekly !== undefined ? pos.sameStaffWeekly : false,
+      allowMultiple: pos.allowMultiple !== undefined ? pos.allowMultiple : false,
+      staffSeveral: pos.staffSeveral !== undefined ? pos.staffSeveral : false,
+      horidayToday: pos.horidayToday !== undefined ? pos.horidayToday : false,
+      horidayTomorrow: pos.horidayTomorrow !== undefined ? pos.horidayTomorrow : false,
+      departments: pos.departments || [],
+    });
+    console.log("Editing position with id:", newEditingId);
     headerRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // フォーム内での削除用関数
+  const handleDeleteFromForm = async () => {
+    if (!formData.id) return;
+    const confirmDelete = confirm(`ポジション「${formData.name}」を削除してよろしいですか？`);
+    if (!confirmDelete) return;
+
+    const res = await fetch("/api/positions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: formData.id }),
+    });
+    if (res.ok) {
+      await fetchPositions();
+      handleClear();
+    } else {
+      alert("削除に失敗しました。");
+    }
   };
 
   const handleClear = () => {
@@ -111,6 +171,9 @@ export default function PositionEditPage() {
       required: false,
       sameStaffWeekly: false,
       allowMultiple: false,
+      staffSeveral: false,
+      horidayToday: false,
+      horidayTomorrow: false,
       departments: [],
     });
   };
@@ -165,9 +228,8 @@ export default function PositionEditPage() {
           />
         </div>
         <div>
-          <label className="block mb-2 font-medium">出力セル:</label>
+          <label className="block mb-2 font-medium">勤務表イメージ:</label>
           <div className="mb-2">
-            {/* CellSelector の表示は、フィルター適用後の filteredPositions を利用 */}
             <CellSelector
               positions={filteredPositions}
               onChange={handleCellUpdate}
@@ -194,7 +256,9 @@ export default function PositionEditPage() {
           />
         </div>
         <div>
-          <label className="block mb-2 font-medium">部門 (複数ならカンマ区切り):</label>
+          <label className="block mb-2 font-medium">
+            部門 (基本一つずつ登録する。複数なら半角カンマ区切り。休み(種類)も登録してください。休み(種類)は、この書き方をしないと休み情報から反映されないです。:
+          </label>
           <input
             type="text"
             value={formData.departments ? formData.departments.join(", ") : ""}
@@ -240,6 +304,40 @@ export default function PositionEditPage() {
             複数人配置を許容する
           </label>
         </div>
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.staffSeveral}
+              onChange={(e) => setFormData({ ...formData, staffSeveral: e.target.checked })}
+              className="mr-2"
+            />
+            早番、遅番、採血早番、夜勤、日直ですか？
+          </label>
+        </div>
+        {/* 当日休み・翌日休みのチェックボックス */}
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.horidayToday}
+              onChange={(e) => setFormData({ ...formData, horidayToday: e.target.checked })}
+              className="mr-2"
+            />
+            当日を休みにする
+          </label>
+        </div>
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.horidayTomorrow}
+              onChange={(e) => setFormData({ ...formData, horidayTomorrow: e.target.checked })}
+              className="mr-2"
+            />
+            翌日を休みにする
+          </label>
+        </div>
         <div className="flex space-x-4">
           <button
             type="submit"
@@ -248,13 +346,22 @@ export default function PositionEditPage() {
             {editingId ? "更新" : "登録"}
           </button>
           {editingId && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="flex-1 px-4 py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
-            >
-              クリア
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="flex-1 px-4 py-3 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+              >
+                クリア
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteFromForm}
+                className="flex-1 px-4 py-3 bg-red-500 text-white rounded hover:bg-red-600 transition"
+              >
+                削除
+              </button>
+            </>
           )}
         </div>
       </form>
@@ -264,10 +371,17 @@ export default function PositionEditPage() {
         {filteredPositions.map((pos) => (
           <li
             key={pos.id}
-            onClick={() => handleEdit(pos)}
-            className="cursor-pointer border border-gray-300 p-3 rounded hover:bg-gray-100 transition"
+            className="cursor-pointer border border-gray-300 p-3 rounded hover:bg-gray-100 transition flex justify-between items-center"
           >
-            <span className="font-bold">{pos.name}</span> — 出力セル: {pos.outputCell || "未設定"} — 優先度: {pos.priority} — {pos.required ? "必須" : "任意"} — {pos.sameStaffWeekly ? "同一" : "変更"} — {pos.allowMultiple ? "複数配置可" : "単一配置"} — 部門: {pos.departments ? pos.departments.join(", ") : ""}
+            <div onClick={() => handleEdit(pos)}>
+              <span className="font-bold">{pos.name}</span> — 出力セル: {pos.outputCell || "未設定"} — 優先度: {pos.priority} — {pos.required ? "必須" : "任意"} — {pos.sameStaffWeekly ? "同一" : "変更"} — {pos.allowMultiple ? "複数配置可" : "単一配置"} — 早番、遅番、採血早番、夜勤: {pos.staffSeveral ? "〇" : "✕"} — 当日休み: {pos.horidayToday ? "〇" : "✕"} — 翌日休み: {pos.horidayTomorrow ? "〇" : "✕"} — 部門: {pos.departments ? pos.departments.join(", ") : ""}
+            </div>
+            <button
+              onClick={() => handleDeleteFromForm()}
+              className="ml-4 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+            >
+              削除
+            </button>
           </li>
         ))}
       </ul>
@@ -275,15 +389,20 @@ export default function PositionEditPage() {
   );
 }
 
+/** CellSelector コンポーネント部分は変更しなくてもOKですが、
+ * 既存ポジションを編集する際には handleEdit が呼ばれるように統一したい場合、
+ * 下記のように handleCellSelect(pos) => handleEdit(pos) とするのがベターです。
+ * （既に行っているため今回は大きな修正不要）
+ */
 interface CellSelectorProps {
   positions: Position[];
   onChange: (updatedPositions: Position[]) => void;
-  onCellSelect?: (cell: string) => void;
+  onCellSelect?: (pos: Position | null, cell?: string) => void;
   previewMonth: number;
 }
 
 function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellSelectorProps) {
-  const columns = Array.from({ length: 15 }, (_, i) => String.fromCharCode(65 + i));
+  const columns = Array.from({ length: 20 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 3 }, (_, i) => i + 1);
 
   const cellAssignments: { [cell: string]: Position[] } = {};
@@ -298,18 +417,17 @@ function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellS
 
   const handleCellClick = (cell: string) => {
     if (cellAssignments[cell]?.length) {
-      const currentPosNames = cellAssignments[cell].map((p) => p.name).join(", ");
-      const confirmRemove = confirm(`セル ${cell} に割り当てられている [${currentPosNames}] を解除しますか？`);
-      if (confirmRemove) {
-        const updatedPositions = positions.map((pos) =>
-          pos.outputCell === cell ? { ...pos, outputCell: "" } : pos
-        );
-        onChange(updatedPositions);
+      // 既に割り当てられている場合
+      const positionToEdit = cellAssignments[cell][0]; // 複数ある場合は先頭を対象
+      if (onCellSelect) {
+        onCellSelect(positionToEdit);
       }
     } else {
+      // 未割り当ての場合はセル選択のみを伝える
       if (onCellSelect) {
-        onCellSelect(cell);
+        onCellSelect(null, cell);
       } else {
+        // ここはフォールバック
         const newPosId = prompt(`セル ${cell} に割り当てるポジションのIDを入力してください。`);
         if (newPosId) {
           const posIndex = positions.findIndex((p) => p.id === newPosId);
@@ -334,7 +452,6 @@ function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellS
               {columns.map((col) => {
                 const cell = `${col}${row}`;
                 const assignedPositions = cellAssignments[cell] || [];
-                // もしセルが A列で、行番号が2以上の場合、プレビューとして日付表示（例：4月1日など）
                 let displayLabel = cell;
                 if (col === "A" && row >= 2) {
                   const day = row - 1;
