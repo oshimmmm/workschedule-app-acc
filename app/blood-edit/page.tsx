@@ -61,7 +61,10 @@ export default function BloodEditPage() {
     const res = await fetch("/api/staff");
     if (res.ok) {
       const data = await res.json();
-      const options = data.map((staff: any) => ({ id: staff.id, name: staff.name }));
+      const options = data.map((staff: { id: string; name: string }) => ({
+        id: staff.id,
+        name: staff.name,
+      }));
       setStaffOptions(options);
     }
   };

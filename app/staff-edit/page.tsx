@@ -62,7 +62,7 @@ export default function StaffEditPage() {
     if (res.ok) {
       const data = await res.json();
       // PositionOption の departments フィールドも保持する
-      const options = data.map((pos: any) => ({
+      const options = data.map((pos: { id: string; name: string; departments?: string[] }) => ({
         id: pos.id,
         name: pos.name,
         departments: pos.departments,

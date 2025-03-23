@@ -35,7 +35,7 @@ export default function PositionEditPage() {
   });
   // プレビュー用に現在の月を数値で保持（例：4なら4月）
   const today = new Date();
-  const [previewMonth, setPreviewMonth] = useState<number>(today.getMonth() + 1);
+  const [previewMonth] = useState<number>(today.getMonth() + 1);
 
   const headerRef = useRef<HTMLHeadingElement>(null);
 

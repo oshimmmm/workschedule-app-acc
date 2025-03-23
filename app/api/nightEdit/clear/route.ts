@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     
     // staff コレクションの全ドキュメントを取得
     const staffSnapshot = await getDocs(collection(db, "staff"));
-    const updatePromises: Promise<any>[] = [];
+    const updatePromises: Promise<void>[] = [];
     
     staffSnapshot.forEach((docSnapshot) => {
       const data = docSnapshot.data();

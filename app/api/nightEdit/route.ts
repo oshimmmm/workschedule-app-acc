@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         const dates = data[shiftType];
         // dates が配列であることを確認
         if (Array.isArray(dates)) {
-          dates.forEach((dateValue: any) => {
+          dates.forEach((dateValue: string) => {
             // 例: dateValue は "2025-04-22" のような文字列であることを想定
             // クエリパラメータ month がある場合は、対象月以外はスキップ
             if (month && !dateValue.startsWith(month)) {
