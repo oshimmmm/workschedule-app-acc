@@ -218,7 +218,7 @@ export default function PositionEditPage() {
       </h1>
       <form onSubmit={handleSubmit} className="mb-8 space-y-6 bg-white p-6 shadow rounded">
         <div>
-          <label className="block mb-2 font-medium">ポジション名:</label>
+          <label className="block mb-2 font-medium">ポジション名:　二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有給),休み(振休),休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で反映されます。</label>
           <input
             type="text"
             value={formData.name}
@@ -257,7 +257,7 @@ export default function PositionEditPage() {
         </div>
         <div>
           <label className="block mb-2 font-medium">
-            部門 (基本一つずつ登録する。複数なら半角カンマ区切り。休み(種類)も登録してください。休み(種類)は、この書き方をしないと休み情報から反映されないです。:
+            部門 (基本、自部署の部署名のみでOK。休み(種類)や二交代なども、ここは自部署で登録してください。):
           </label>
           <input
             type="text"
