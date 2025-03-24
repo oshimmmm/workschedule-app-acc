@@ -257,7 +257,7 @@ export default function StaffEditPage() {
         </div>
 
         <div>
-          <label className="block mb-1">配属先:　二交代や待機、日直主あるいは日直副も入れるようになったら登録してください</label>
+          <label className="block mb-1">配属先:　二交代や待機、日直主あるいは日直副に入れるようになったら、配属先に追加登録してください</label>
           <div className="space-y-2">
             {formData.departments.map((department, index) => (
               <input

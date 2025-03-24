@@ -261,7 +261,7 @@ export default function NightShiftEditPage() {
     });
 
     if (res.ok) {
-      alert("夜勤シフト情報が更新されました");
+      alert("日当直情報が更新されました");
       loadShiftData(selectedMonth);
     } else {
       alert("更新に失敗しました");
@@ -298,17 +298,17 @@ export default function NightShiftEditPage() {
       body: JSON.stringify({ month: selectedMonth }),
     });
     if (res.ok) {
-      alert("この月の夜勤シフトデータがクリアされました");
+      alert("この月の日当直データがクリアされました");
       loadShiftData(selectedMonth);
     } else {
-      alert("夜勤シフトデータのクリアに失敗しました");
+      alert("日当直データのクリアに失敗しました");
     }
   };
 
   return (
     <Box sx={{ maxWidth: "90%", mx: "auto", p: 2 }}>
       <Typography variant="h4" gutterBottom>
-        夜勤シフト編集
+        日当直情報編集
       </Typography>
       <TextField
         type="month"
@@ -368,7 +368,7 @@ export default function NightShiftEditPage() {
           確定
         </Button>
         <Button variant="contained" color="error" onClick={handleClear}>
-          夜勤シフトデータクリア
+          この月のデータクリア
         </Button>
       </Box>
     </Box>
