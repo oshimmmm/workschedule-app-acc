@@ -67,6 +67,9 @@ const DayCell: React.FC<DayCellProps> = ({ date, shiftData, staffOptions, onChan
   // 休日判定: APIで取得した祝日リストに含まれる日付、または
   // 振替休日: 月曜日で、前日（日曜日）が祝日だった場合
   const isHoliday = (date: Date): boolean => {
+    // 週末の場合は true を返す（日曜日:0, 土曜日:6）
+    if (date.getDay() === 0 || date.getDay() === 6) return true;
+
     const formatted = format(date, "yyyy-MM-dd");
     if (holidays.includes(formatted)) return true;
     if (date.getDay() === 1) { // 月曜日の場合
