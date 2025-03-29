@@ -14,6 +14,7 @@ interface Position {
   horidayToday: boolean;    // 当日休みフラグ
   horidayTomorrow: boolean; // 翌日休みフラグ
   departments?: string[];
+  dependence?: string; // 依存ポジションのドキュメントIDを格納するフィールド
 }
 
 export default function PositionEditPage() {
@@ -21,6 +22,8 @@ export default function PositionEditPage() {
   // 部門フィルター用（"新規登録" を選択するとCellSelectorには何も表示しない）
   const [selectedDepartment, setSelectedDepartment] = useState<string>("新規登録");
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 依存ポジション設定の有無を管理する状態
+  const [enableDependence, setEnableDependence] = useState<boolean>(false);
   const [formData, setFormData] = useState<Position>({
     name: "",
     outputCell: "",
@@ -29,9 +32,10 @@ export default function PositionEditPage() {
     sameStaffWeekly: false,
     allowMultiple: false,
     staffSeveral: false,
-    horidayToday: false,    // 初期値 false
-    horidayTomorrow: false, // 初期値 false
+    horidayToday: false,
+    horidayTomorrow: false,
     departments: [],
+    dependence: "", // 初期値は空文字
   });
   // プレビュー用に現在の月を数値で保持（例：4なら4月）
   const today = new Date();
@@ -57,26 +61,29 @@ export default function PositionEditPage() {
 
   /**
    * セルがクリックされたときの処理
-   * - 既にポジションが割り当てられていれば handleEdit(pos) で編集開始
-   * - まだ割り当てが無ければ、outputCell のみを更新（新規登録用）
    */
   const handleCellSelect = (pos: Position | null, cell?: string) => {
     if (pos) {
-      // 既存のポジションを編集
       handleEdit(pos);
     } else if (cell) {
-      // 新規割り当て（outputCell のみ更新）
       setFormData((prev) => ({ ...prev, outputCell: cell }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 依存ポジション設定がオフの場合、formDataからdependenceを除外
+    const submitData = { ...formData };
+    if (!enableDependence) {
+      delete submitData.dependence;
+    }
+
     if (editingId) {
       const res = await fetch("/api/positions", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingId, ...formData }),
+        body: JSON.stringify({ id: editingId, ...submitData }),
       });
       if (res.ok) {
         await fetchPositions();
@@ -92,13 +99,15 @@ export default function PositionEditPage() {
           horidayToday: false,
           horidayTomorrow: false,
           departments: [],
+          dependence: "",
         });
+        setEnableDependence(false);
       }
     } else {
       const res = await fetch("/api/positions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
       if (res.ok) {
         const newPos = await res.json();
@@ -114,14 +123,15 @@ export default function PositionEditPage() {
           horidayToday: false,
           horidayTomorrow: false,
           departments: [],
+          dependence: "",
         });
+        setEnableDependence(false);
       }
     }
   };
 
   /**
    * 既存ポジションの編集時にフォームへ反映させる。
-   * ここですべての項目にデフォルト値を付与し、uncontrolled → controlled を防ぐ。
    */
   const handleEdit = (pos: Position) => {
     const newEditingId = pos.id || null;
@@ -138,7 +148,10 @@ export default function PositionEditPage() {
       horidayToday: pos.horidayToday !== undefined ? pos.horidayToday : false,
       horidayTomorrow: pos.horidayTomorrow !== undefined ? pos.horidayTomorrow : false,
       departments: pos.departments || [],
+      dependence: pos.dependence || "",
     });
+    // 依存ポジションが設定されている場合はチェックボックスをオンにする
+    setEnableDependence(!!pos.dependence);
     console.log("Editing position with id:", newEditingId);
     headerRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -175,7 +188,9 @@ export default function PositionEditPage() {
       horidayToday: false,
       horidayTomorrow: false,
       departments: [],
+      dependence: "",
     });
+    setEnableDependence(false);
   };
 
   const departmentOptions = Array.from(
@@ -218,7 +233,7 @@ export default function PositionEditPage() {
       </h1>
       <form onSubmit={handleSubmit} className="mb-8 space-y-6 bg-white p-6 shadow rounded">
         <div>
-          <label className="block mb-2 font-medium">ポジション名:　二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有給),休み(振休),休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で反映されます。</label>
+        <label className="block mb-2 font-medium">ポジション名:　二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有給),休み(振休),休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で反映されます。</label>
           <input
             type="text"
             value={formData.name}
@@ -257,7 +272,7 @@ export default function PositionEditPage() {
         </div>
         <div>
           <label className="block mb-2 font-medium">
-            部門 (基本、自部署の部署名のみでOK。休み(種類)や二交代なども、ここは自部署で登録してください。):
+          部門 (基本、自部署の部署名のみでOK。休み(種類)や二交代なども、ここは自部署で登録してください。):
           </label>
           <input
             type="text"
@@ -312,7 +327,7 @@ export default function PositionEditPage() {
               onChange={(e) => setFormData({ ...formData, staffSeveral: e.target.checked })}
               className="mr-2"
             />
-            早番、遅番、採血早番、夜勤、日直ですか？
+            早番、遅番、採血早番、夜勤ですか？
           </label>
         </div>
         {/* 当日休み・翌日休みのチェックボックス */}
@@ -338,6 +353,40 @@ export default function PositionEditPage() {
             翌日を休みにする
           </label>
         </div>
+        {/* 依存ポジション設定用チェックボックスとプルダウン */}
+        <div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={enableDependence}
+              onChange={(e) => {
+                setEnableDependence(e.target.checked);
+                if (!e.target.checked) {
+                  setFormData((prev) => ({ ...prev, dependence: "" }));
+                }
+              }}
+              className="mr-2"
+            />
+            依存ポジションを設定する
+          </label>
+        </div>
+        {enableDependence && (
+          <div>
+            <label className="block mb-2 font-medium">依存ポジション:</label>
+            <select
+              value={formData.dependence || ""}
+              onChange={(e) => setFormData({ ...formData, dependence: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-400"
+            >
+              <option value="">選択してください</option>
+              {filteredPositions.map((pos) => (
+                <option key={pos.id} value={pos.id}>
+                  {pos.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex space-x-4">
           <button
             type="submit"
@@ -374,7 +423,7 @@ export default function PositionEditPage() {
             className="cursor-pointer border border-gray-300 p-3 rounded hover:bg-gray-100 transition flex justify-between items-center"
           >
             <div onClick={() => handleEdit(pos)}>
-              <span className="font-bold">{pos.name}</span> — 出力セル: {pos.outputCell || "未設定"} — 優先度: {pos.priority} — {pos.required ? "必須" : "任意"} — {pos.sameStaffWeekly ? "同一" : "変更"} — {pos.allowMultiple ? "複数配置可" : "単一配置"} — 早番、遅番、採血早番、夜勤: {pos.staffSeveral ? "〇" : "✕"} — 当日休み: {pos.horidayToday ? "〇" : "✕"} — 翌日休み: {pos.horidayTomorrow ? "〇" : "✕"} — 部門: {pos.departments ? pos.departments.join(", ") : ""}
+              <span className="font-bold">{pos.name}</span> — 出力セル: {pos.outputCell || "未設定"} — 優先度: {pos.priority} — {pos.required ? "必須" : "任意"} — {pos.sameStaffWeekly ? "同一" : "変更"} — {pos.allowMultiple ? "複数配置可" : "単一配置"} — 早番、遅番、採血早番、夜勤: {pos.staffSeveral ? "〇" : "✕"} — 当日休み: {pos.horidayToday ? "〇" : "✕"} — 翌日休み: {pos.horidayTomorrow ? "〇" : "✕"} — 部門: {pos.departments ? pos.departments.join(", ") : ""} {pos.dependence && `— 依存: ${pos.dependence}`}
             </div>
             <button
               onClick={() => handleDeleteFromForm()}
@@ -389,11 +438,6 @@ export default function PositionEditPage() {
   );
 }
 
-/** CellSelector コンポーネント部分は変更しなくてもOKですが、
- * 既存ポジションを編集する際には handleEdit が呼ばれるように統一したい場合、
- * 下記のように handleCellSelect(pos) => handleEdit(pos) とするのがベターです。
- * （既に行っているため今回は大きな修正不要）
- */
 interface CellSelectorProps {
   positions: Position[];
   onChange: (updatedPositions: Position[]) => void;
@@ -417,17 +461,15 @@ function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellS
 
   const handleCellClick = (cell: string) => {
     if (cellAssignments[cell]?.length) {
-      // 既に割り当てられている場合
-      const positionToEdit = cellAssignments[cell][0]; // 複数ある場合は先頭を対象
+      // 既に割り当てられている場合、先頭のポジションを編集対象とする
+      const positionToEdit = cellAssignments[cell][0];
       if (onCellSelect) {
         onCellSelect(positionToEdit);
       }
     } else {
-      // 未割り当ての場合はセル選択のみを伝える
       if (onCellSelect) {
         onCellSelect(null, cell);
       } else {
-        // ここはフォールバック
         const newPosId = prompt(`セル ${cell} に割り当てるポジションのIDを入力してください。`);
         if (newPosId) {
           const posIndex = positions.findIndex((p) => p.id === newPosId);
