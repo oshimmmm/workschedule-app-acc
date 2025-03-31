@@ -50,7 +50,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center items-center">
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
       <div className="p-8">
         <h1 className="text-2xl font-bold mb-4 text-blue-600">勤務表作成</h1>
         <div className="flex items-center space-x-4 mb-4">
@@ -85,8 +85,18 @@ export default function HomePage() {
         >
           勤務表作成＆ダウンロード
         </button>
+        
       </div>
+      <p className="mt-4 text-gray-600">
+          ①ポジション編集で、勤務表に載せたいポジションを登録、編集する。<br />
+          ②スタッフ編集で、スタッフを登録、編集する。<br />
+          ↑1度入力、登録すればそれでOK<br />
+          <br />
+          ↓毎月やること↓<br />
+          ③休み編集で、スタッフの休みを入力し、確定ボタンを押す。（二交代の入り明けや待機の明けは入力不要）<br />
+          ④日当直情報編集で、スタッフの日当直情報を入力する。（日当直勤務を作る人が、”夜勤用作成”で作成した場合は自動入力される）<br />
+          ⑤対象月と部門を選択し、”勤務表作成＆ダウンロード”を押す。
+        </p>
     </div>
-
   );
 }

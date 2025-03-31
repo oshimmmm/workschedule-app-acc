@@ -54,7 +54,7 @@ export default function NightShiftPage() {
       >
         夜勤勤務表作成＆ダウンロード
       </button>
-      <p>
+      <p className="mt-4 text-gray-600">
         ＊各部署が均等な数になるように配置(生理は多め、輸血は少なめ)<br />
         ＊休日前の回数も各部署なるべく均一になるように配置<br />
         ＊部署内においても各要員がなるべく均等な回数になるように配置<br />
@@ -69,6 +69,7 @@ export default function NightShiftPage() {
       </p>
 
       <p className="mt-4 text-red-600 font-bold">
+      ＊スタッフ編集で、配属先に二交代、待機、日直主、日直副を追加登録されたスタッフが選ばれる仕組みです。<br />
       ＊作成したら、自動的に”日当直情報編集”に反映されます<br />
       ＊開始月と終了月を広い範囲で作成すると、より均等なシフトが組めます
       </p>

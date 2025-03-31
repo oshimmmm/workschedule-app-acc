@@ -317,8 +317,9 @@ export default function HolidayEditPage() {
           確定
         </Button>
         <Button variant="contained" color="error" onClick={handleClear}>
-          休みデータクリア
+          古い休みデータをクリア
         </Button>
+        <p>＊”古い休みデータをクリア”を押すと2年以上経過した休みデータが削除されます。データ量圧迫を防ぐために行って下さい</p>
       </Box>
     </Box>
   );

@@ -215,7 +215,17 @@ export default function PositionEditPage() {
           部門選択:
           <select
             value={selectedDepartment}
-            onChange={(e) => setSelectedDepartment(e.target.value)}
+            onChange={(e) => {
+              const dept = e.target.value;
+              setSelectedDepartment(dept);
+              // 「新規登録」以外なら、フォームの部門フィールドに自動入力
+              if (dept !== "新規登録") {
+                setFormData((prev) => ({ ...prev, departments: [dept] }));
+              } else {
+                // 必要に応じてクリアする場合は
+                setFormData((prev) => ({ ...prev, departments: [] }));
+              }
+            }}
             className="ml-2 p-2 border border-gray-300 rounded"
           >
             <option value="新規登録">新規登録</option>
@@ -226,6 +236,8 @@ export default function PositionEditPage() {
             ))}
           </select>
         </label>
+        <p className="text-gray-500 text-sm">↑まずは自部署を選択してください↑</p>
+        <p className="text-gray-500 text-sm">自部署が無い場合は、"新規登録"を選択して下部を入力し、一旦1つポジションを登録してください。登録した後に自部署を選択してください。</p>
       </div>
 
       <h1 ref={headerRef} className="text-3xl font-bold mb-6 text-center">
@@ -233,7 +245,10 @@ export default function PositionEditPage() {
       </h1>
       <form onSubmit={handleSubmit} className="mb-8 space-y-6 bg-white p-6 shadow rounded">
         <div>
-        <label className="block mb-2 font-medium">ポジション名:　二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有休),休み(振休),休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で反映されます。</label>
+        <label className="block mb-2 font-medium">
+          ポジション名:
+        </label>
+        <p className="text-gray-500 text-sm">＊二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有休)や、休み(振休)や、休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で勤務表に反映されます。</p>
           <input
             type="text"
             value={formData.name}
@@ -272,8 +287,9 @@ export default function PositionEditPage() {
         </div>
         <div>
           <label className="block mb-2 font-medium">
-          部門 (基本、自部署の部署名のみでOK。休み(種類)や二交代なども、ここは自部署で登録してください。):
+          部門:
           </label>
+          <p className="text-gray-500 text-sm">＊基本、自部署の部署名のみでOK。休み(種類)や二交代などのポジション登録時も、ここは自部署で登録してください。</p>
           <input
             type="text"
             value={formData.departments ? formData.departments.join(", ") : ""}
@@ -284,7 +300,7 @@ export default function PositionEditPage() {
               })
             }
             required
-            placeholder="例: 病理,血液     休み(有休)半角カッコで囲むこと"
+            placeholder="例: 病理"
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-400"
           />
         </div>
@@ -446,7 +462,7 @@ interface CellSelectorProps {
 }
 
 function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellSelectorProps) {
-  const columns = Array.from({ length: 22 }, (_, i) => String.fromCharCode(65 + i));
+  const columns = Array.from({ length: 20 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 3 }, (_, i) => i + 1);
 
   const cellAssignments: { [cell: string]: Position[] } = {};
