@@ -237,7 +237,7 @@ export default function PositionEditPage() {
           </select>
         </label>
         <p className="text-gray-500 text-sm">↑まずは自部署を選択してください↑</p>
-        <p className="text-gray-500 text-sm">自部署が無い場合は、"新規登録"を選択して下部を入力し、一旦1つポジションを登録してください。登録した後に自部署を選択してください。</p>
+        <p className="text-gray-500 text-sm">自部署が無い場合は、&quot;新規登録&quot;を選択して下部を入力し、一旦1つポジションを登録してください。登録した後に自部署を選択してください。</p>
       </div>
 
       <h1 ref={headerRef} className="text-3xl font-bold mb-6 text-center">
