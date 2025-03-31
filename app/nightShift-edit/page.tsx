@@ -27,10 +27,10 @@ interface StaffOption {
   departments: string[]; // 部門情報
 }
 
-type NightShiftType = "待機" | "二交代" | "日直主" | "日直副";
+type NightShiftType = "宿直" | "二交代" | "日直主" | "日直副";
 
 interface ShiftDataEntry {
-  待機: string[];
+  宿直: string[];
   二交代: string[];
   日直主: string[];
   日直副: string[];
@@ -121,7 +121,7 @@ const DayCell: React.FC<DayCellProps> = ({ date, shiftData, staffOptions, onChan
       <Typography variant="subtitle2" align="center" gutterBottom>
         {dayLabel}
       </Typography>
-      {renderSelect("待機", "待機")}
+      {renderSelect("宿直", "宿直")}
       {renderSelect("二交代", "二交代")}
       {showAllShifts && renderSelect("日直主", "日直主")}
       {showAllShifts && renderSelect("日直副", "日直副")}
@@ -210,14 +210,14 @@ export default function NightShiftEditPage() {
     }[] = [];
 
     for (const [date, entry] of Object.entries(shiftData)) {
-      const orig = originalShiftData[date] || { 待機: [], 二交代: [], 日直主: [], 日直副: [] };
-      const cleanedTai = entry.待機.map((s) => s.trim()).filter((s) => s !== "");
+      const orig = originalShiftData[date] || { 宿直: [], 二交代: [], 日直主: [], 日直副: [] };
+      const cleanedTai = entry.宿直.map((s) => s.trim()).filter((s) => s !== "");
       const cleanedNikutai = entry.二交代.map((s) => s.trim()).filter((s) => s !== "");
       const cleanedNichokuShu = entry.日直主.map((s) => s.trim()).filter((s) => s !== "");
       const cleanedNichokuFuku = entry.日直副.map((s) => s.trim()).filter((s) => s !== "");
 
-      const addTai = cleanedTai.filter((s) => !orig.待機.includes(s));
-      const removeTai = orig.待機.filter((s) => !cleanedTai.includes(s));
+      const addTai = cleanedTai.filter((s) => !orig.宿直.includes(s));
+      const removeTai = orig.宿直.filter((s) => !cleanedTai.includes(s));
       const addNikutai = cleanedNikutai.filter((s) => !orig.二交代.includes(s));
       const removeNikutai = orig.二交代.filter((s) => !cleanedNikutai.includes(s));
       const addNichokuShu = cleanedNichokuShu.filter((s) => !orig.日直主.includes(s));
@@ -280,7 +280,7 @@ export default function NightShiftEditPage() {
     setShiftData((prev) => ({
       ...prev,
       [dateStr]: {
-        ...(prev[dateStr] || { 待機: [], 二交代: [], 日直主: [], 日直副: [] }),
+        ...(prev[dateStr] || { 宿直: [], 二交代: [], 日直主: [], 日直副: [] }),
         [type]: values,
       },
     }));
@@ -349,7 +349,7 @@ export default function NightShiftEditPage() {
               shiftData={
                 date
                   ? shiftData[format(date, "yyyy-MM-dd")] || {
-                      待機: [],
+                      宿直: [],
                       二交代: [],
                       日直主: [],
                       日直副: [],

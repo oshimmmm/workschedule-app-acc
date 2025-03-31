@@ -4,13 +4,13 @@ import db from "../../../firebase/db";
 import { collection, getDocs } from "firebase/firestore";
 
 // シフトフィールドとして扱うキーのリテラル型
-type ShiftType = "待機" | "二交代" | "日直主" | "日直副";
+type ShiftType = "宿直" | "二交代" | "日直主" | "日直副";
 // 対象のシフトフィールドを明示的に指定した配列
-const shiftTypes: ShiftType[] = ["待機", "二交代", "日直主", "日直副"];
+const shiftTypes: ShiftType[] = ["宿直", "二交代", "日直主", "日直副"];
 
 // 各日付ごとのシフト情報の型
 interface ShiftDataEntry {
-  待機: string[];
+  宿直: string[];
   二交代: string[];
   日直主: string[];
   日直副: string[];
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
             // 対象の日付キーがまだなければ初期化
             if (!shiftData[dateValue]) {
               shiftData[dateValue] = {
-                待機: [],
+                宿直: [],
                 二交代: [],
                 日直主: [],
                 日直副: [],

@@ -7,9 +7,9 @@ interface RequestBody {
   month: string;
 }
 
-type ShiftType = "待機" | "二交代" | "日直主" | "日直副";
+type ShiftType = "宿直" | "二交代" | "日直主" | "日直副";
 // 対象のシフトフィールドを明示的に指定
-const shiftTypes: ShiftType[] = ["待機", "二交代", "日直主", "日直副"];
+const shiftTypes: ShiftType[] = ["宿直", "二交代", "日直主", "日直副"];
 
 export async function POST(request: Request) {
   try {

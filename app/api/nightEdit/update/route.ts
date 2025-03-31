@@ -4,7 +4,7 @@ import { doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import db from "@/firebase/db";
 
 // シフトフィールドとして扱うキーのリテラル型
-type ShiftType = "待機" | "二交代" | "日直主" | "日直副";
+type ShiftType = "宿直" | "二交代" | "日直主" | "日直副";
 
 // 更新リクエストの各エントリの型
 interface UpdateEntry {
@@ -27,7 +27,7 @@ interface RequestBody {
 
 // 各シフトタイプごとに、更新時の追加・削除用のプロパティ名を定義
 const shiftFieldMapping: { [key in ShiftType]: { add: keyof UpdateEntry; remove: keyof UpdateEntry } } = {
-  待機: { add: "addTai", remove: "removeTai" },
+  宿直: { add: "addTai", remove: "removeTai" },
   二交代: { add: "addNikutai", remove: "removeNikutai" },
   日直主: { add: "addNichokuShu", remove: "removeNichokuShu" },
   日直副: { add: "addNichokuFuku", remove: "removeNichokuFuku" },

@@ -233,7 +233,7 @@ export default function PositionEditPage() {
       </h1>
       <form onSubmit={handleSubmit} className="mb-8 space-y-6 bg-white p-6 shadow rounded">
         <div>
-        <label className="block mb-2 font-medium">ポジション名:　二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有給),休み(振休),休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で反映されます。</label>
+        <label className="block mb-2 font-medium">ポジション名:　二交代や日直主、休み(種類)なども勤務表に載せたい場合は、登録してください。休み(有休),休み(振休),休み(代休)は、この書き方をすれば”休み編集”に登録した内容が自動で反映されます。</label>
           <input
             type="text"
             value={formData.name}
@@ -446,7 +446,7 @@ interface CellSelectorProps {
 }
 
 function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellSelectorProps) {
-  const columns = Array.from({ length: 20 }, (_, i) => String.fromCharCode(65 + i));
+  const columns = Array.from({ length: 22 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 3 }, (_, i) => i + 1);
 
   const cellAssignments: { [cell: string]: Position[] } = {};

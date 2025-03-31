@@ -13,10 +13,8 @@ interface PositionData {
   allowMultiple: boolean;
   staffSeveral?: boolean;
   departments?: string[];
-  // 休みフラグ（trueなら当日/翌日を休みとする）
   horidayToday?: boolean;
   horidayTomorrow?: boolean;
-  // 依存ポジション：このポジションは、dependence に記載された独立ポジションの直近の配置結果を参照する
   dependence?: string;
 }
 
@@ -28,15 +26,12 @@ interface StaffData {
   holidaysFurikyu?: string[];
   holidaysDaikyu?: string[];
   departments?: string[];
-  // 特別割当用の各ポジションフィールド（例："二交代" など）
 }
 
-/** スタッフデータを動的キーで参照できるようにするための型 */
 type StaffIndexable = StaffData & {
-  [key: string]: unknown; // 任意のキーを許容
+  [key: string]: unknown;
 };
 
-// --- 日本の祝日取得 ---
 async function getJapaneseHolidays(year: number, month: number): Promise<string[]> {
   try {
     const res = await fetch("https://holidays-jp.github.io/api/v1/date.json");
@@ -82,9 +77,8 @@ function getDatesInMonth(monthStr: string): Date[] {
   return dates;
 }
 
-// --- ヘルパー関数：次の平日を取得 ---
 async function getNextBusinessDay(date: Date): Promise<string | null> {
-  let next = new Date(date);
+  const next = new Date(date);
   let attempts = 0;
   next.setDate(next.getDate() + 1);
   while (
@@ -98,9 +92,8 @@ async function getNextBusinessDay(date: Date): Promise<string | null> {
 }
 
 async function getPreviousBusinessDay(date: Date): Promise<string | null> {
-  let prev = new Date(date);
+  const prev = new Date(date);
   let attempts = 0;
-  // 昨日からさかのぼる
   prev.setDate(prev.getDate() - 1);
   while (
     (prev.getDay() === 0 || prev.getDay() === 6 || (await isJapaneseHoliday(prev))) &&
@@ -112,23 +105,28 @@ async function getPreviousBusinessDay(date: Date): Promise<string | null> {
   return attempts < 10 ? formatDateLocal(prev) : null;
 }
 
-// --- ヘルパー関数：候補スタッフが次の平日にも利用可能かチェック ---
-// 利用不可なら、次平日の既定休みリスト（holidaysYukyu, holidaysFurikyu, holidaysDaikyu）に含まれているとみなす
-async function isCandidateAvailableNextBusinessDay(
-  candidate: string,
-  currentDate: Date,
-  filteredStaffList: StaffData[]
-): Promise<boolean> {
-  const nextBusinessDateStr = await getNextBusinessDay(currentDate);
-  if (!nextBusinessDateStr) return false;
-  const staff = filteredStaffList.find((s) => s.name === candidate);
-  if (!staff) return false;
-  if (staff.holidaysYukyu && staff.holidaysYukyu.includes(nextBusinessDateStr)) return false;
-  if (staff.holidaysFurikyu && staff.holidaysFurikyu.includes(nextBusinessDateStr)) return false;
-  if (staff.holidaysDaikyu && staff.holidaysDaikyu.includes(nextBusinessDateStr)) return false;
-  // ※ 必要に応じて、グローバルな specialHolidays（次平日の情報）があれば、そちらもチェックできます
-  return true;
-}
+// async function isCandidateAvailableNextBusinessDay(
+//   candidate: string,
+//   currentDate: Date,
+//   filteredStaffList: StaffData[],
+//   specialHolidaysNext?: Set<string>,
+//   holidaysYukyuNext?: Set<string>,
+//   holidaysFurikyuNext?: Set<string>,
+//   holidaysDaikyuNext?: Set<string>
+// ): Promise<boolean> {
+//   const nextBusinessDateStr = await getNextBusinessDay(currentDate);
+//   if (!nextBusinessDateStr) return false;
+//   const staff = filteredStaffList.find((s) => s.name === candidate);
+//   if (!staff) return false;
+//   if (staff.holidaysYukyu && staff.holidaysYukyu.includes(nextBusinessDateStr)) return false;
+//   if (staff.holidaysFurikyu && staff.holidaysFurikyu.includes(nextBusinessDateStr)) return false;
+//   if (staff.holidaysDaikyu && staff.holidaysDaikyu.includes(nextBusinessDateStr)) return false;
+//   if (specialHolidaysNext && specialHolidaysNext.has(candidate)) return false;
+//   if (holidaysYukyuNext && holidaysYukyuNext.has(candidate)) return false;
+//   if (holidaysFurikyuNext && holidaysFurikyuNext.has(candidate)) return false;
+//   if (holidaysDaikyuNext && holidaysDaikyuNext.has(candidate)) return false;
+//   return true;
+// }
 
 export async function POST(request: Request) {
   const { month, department } = (await request.json()) as { month: string; department?: string };
@@ -140,7 +138,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "指定された月の日付を取得できません" }, { status: 400 });
   }
 
-  // Firestore から取得
   const posSnapshot = await getDocs(collection(db, "positions"));
   const positions: PositionData[] = posSnapshot.docs.map(
     (doc) => ({ id: doc.id, ...doc.data() } as PositionData)
@@ -150,7 +147,6 @@ export async function POST(request: Request) {
     (doc) => ({ id: doc.id, ...doc.data() } as StaffData)
   );
 
-  // 部門フィルター
   let filteredPositions: PositionData[] = positions;
   let filteredStaffList: StaffData[] = staffList;
   if (department && department !== "") {
@@ -162,10 +158,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // 優先度ソート
   filteredPositions.sort((a, b) => a.priority - b.priority);
 
-  // 休み用ポジション（名称判定）
   const holidayPosYukyu = filteredPositions.filter((pos) =>
     pos.name.startsWith("休み(有休)")
   );
@@ -176,10 +170,8 @@ export async function POST(request: Request) {
     pos.name.startsWith("休み(代休)")
   );
 
-  // 通常ポジション（休みポジション以外）
   const normalPositions = filteredPositions.filter((pos) => !pos.name.startsWith("休み"));
 
-  // ※ 依存される側（独立ポジション）で、他から参照されるもののIDをセット化
   const referencedIndependentIds = new Set<string>();
   for (const pos of normalPositions) {
     if (pos.dependence && pos.dependence.trim() !== "") {
@@ -187,12 +179,42 @@ export async function POST(request: Request) {
     }
   }
 
-  // Excel ワークブック作成
+  // 事前計算フェーズ：対象月全体の specialHolidays 情報を算出（上書き管理）
+  const preCalcSpecialHolidays: { [dateStr: string]: Set<string> } = {};
+  for (const date of dates) {
+    const dStr = formatDateLocal(date);
+    if (!preCalcSpecialHolidays[dStr]) {
+      preCalcSpecialHolidays[dStr] = new Set<string>();
+    }
+    for (const pos of normalPositions) {
+      for (const staff of staffList) {
+        const staffIndexable = staff as StaffIndexable;
+        const specialField = staffIndexable[pos.name] as string[] | undefined;
+        if (Array.isArray(specialField) && specialField.includes(dStr)) {
+          if (pos.horidayToday && pos.horidayTomorrow) {
+            preCalcSpecialHolidays[dStr].add(staff.name);
+            const nextDateStr = await getNextBusinessDay(date);
+            if (nextDateStr) {
+              preCalcSpecialHolidays[nextDateStr] = new Set<string>([staff.name]);
+            }
+          } else if (pos.horidayToday) {
+            preCalcSpecialHolidays[dStr].add(staff.name);
+          } else if (!pos.horidayToday && pos.horidayTomorrow) {
+            const nextDateStr = await getNextBusinessDay(date);
+            if (nextDateStr) {
+              preCalcSpecialHolidays[nextDateStr] = new Set<string>([staff.name]);
+            }
+          }
+        }
+      }
+    }
+    console.log(`事前計算: 日付 ${dStr} の specialHolidays =`, preCalcSpecialHolidays[dStr]);
+  }
+
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("勤務表");
   worksheet.getCell("A1").value = "日付";
 
-  // ヘッダー出力（通常・休みポジション）
   normalPositions.forEach((pos) => {
     if (!pos.outputCell) return;
     const match = pos.outputCell.match(/^([A-Z]+)(\d+)$/);
@@ -208,23 +230,26 @@ export async function POST(request: Request) {
     });
   });
 
-  // 週ごとの同一スタッフ利用管理
   let weeklyAssignments: { [weekKey: string]: string } = {};
   let prevWeeklyAssignments: { [weekKey: string]: string } = {};
   let currentWeekStart: string = "";
 
-  // 割当結果マップ（キー：日付、値：各ポジションの割当配列）
   const staffAssignments: { [dateStr: string]: { [posId: string]: string[] } } = {};
-  const staffSeveralCount: { [name: string]: number } = {};
 
-  // 特別割当により休みとするスタッフの管理（キー：日付、値：スタッフ名の Set）
+  // // 従来の global カウンター（staffSeveral=false 用など）は staffSeveralCount として残す
+  // const staffSeveralCount: { [name: string]: number } = {};
+
+  // ここでは、各 staffSeveral=true のポジションごとの個別カウンターを管理する
+  const staffSeveralCounts: { [posId: string]: { [staffName: string]: number } } = {};
+  // 新たに、通常ポジション（staffSeveralがfalse）の個別カウンターを管理する
+  const normalCounts: { [posId: string]: { [staffName: string]: number } } = {};
+
   const specialHolidays: { [dateStr: string]: Set<string> } = {};
 
   console.log(`[generate] dates.length = ${dates.length}`);
   console.log(`[generate] positions.length = ${filteredPositions.length}`);
   console.log(`[generate] staffList.length = ${filteredStaffList.length}`);
 
-  // 日付ごとのループ
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
     const dateStr = formatDateLocal(date);
@@ -232,7 +257,6 @@ export async function POST(request: Request) {
     worksheet.getCell(`A${rowIndex}`).value = dateStr;
     const day = date.getDay();
 
-    // 週の開始日（月曜日）算出
     const currentDate = new Date(date);
     const diffForMonday = currentDate.getDay() === 0 ? -6 : 1 - currentDate.getDay();
     const weekStartDate = new Date(currentDate);
@@ -244,29 +268,19 @@ export async function POST(request: Request) {
       currentWeekStart = weekStartStr;
     }
 
-    // 既定の休み情報による休みスタッフ抽出
     const holidayStaffYukyu = filteredStaffList.filter(
-      (s) =>
-        s.holidaysYukyu &&
-        Array.isArray(s.holidaysYukyu) &&
-        s.holidaysYukyu.includes(dateStr)
+      (s) => s.holidaysYukyu && Array.isArray(s.holidaysYukyu) && s.holidaysYukyu.includes(dateStr)
     );
     const holidayStaffFurikyu = filteredStaffList.filter(
-      (s) =>
-        s.holidaysFurikyu &&
-        Array.isArray(s.holidaysFurikyu) &&
-        s.holidaysFurikyu.includes(dateStr)
+      (s) => s.holidaysFurikyu && Array.isArray(s.holidaysFurikyu) && s.holidaysFurikyu.includes(dateStr)
     );
     const holidayStaffDaikyu = filteredStaffList.filter(
-      (s) =>
-        s.holidaysDaikyu &&
-        Array.isArray(s.holidaysDaikyu) &&
-        s.holidaysDaikyu.includes(dateStr)
+      (s) => s.holidaysDaikyu && Array.isArray(s.holidaysDaikyu) && s.holidaysDaikyu.includes(dateStr)
     );
 
     // ★【特別割当処理】★
     const specialAssigned = new Set<string>();
-    const specialAssignedTomorrowOnly = new Set<string>(); // 翌日のみ休みのスタッフ用
+    const specialAssignedTomorrowOnly = new Set<string>();
     if (!staffAssignments[dateStr]) {
       staffAssignments[dateStr] = {};
     }
@@ -274,7 +288,6 @@ export async function POST(request: Request) {
       if (!staffAssignments[dateStr][pos.id]) {
         staffAssignments[dateStr][pos.id] = [];
       }
-      // スタッフデータは全体（staffList）からチェック
       for (const staff of staffList) {
         const staffIndexable = staff as StaffIndexable;
         const specialField = staffIndexable[pos.name] as string[] | undefined;
@@ -306,7 +319,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 休みポジションの出力（既定の休み情報）
+    // 休みポジションの出力
     holidayPosYukyu.forEach((pos, j) => {
       const match = pos.outputCell.match(/^([A-Z]+)(\d+)$/);
       if (!match) return;
@@ -350,7 +363,6 @@ export async function POST(request: Request) {
       }
     });
 
-    // 当日の利用可能スタッフを決定
     const unassignedStaff = new Set(filteredStaffList.map((s) => s.name));
     [...holidayStaffYukyu, ...holidayStaffFurikyu, ...holidayStaffDaikyu].forEach((s) =>
       unassignedStaff.delete(s.name)
@@ -360,28 +372,22 @@ export async function POST(request: Request) {
       specialHolidays[dateStr].forEach((name) => unassignedStaff.delete(name));
     }
 
-    // 土日・祝日は通常配置をスキップ（特別割当は既に出力済み）
     const holidayFlag = await isJapaneseHoliday(date);
     if (day === 0 || day === 6 || holidayFlag) continue;
 
-    // ★【通常配置の再配置試行】★
-    // バックアップ状態
     const preservedAssignments: { [posId: string]: string[] } = {};
     for (const pos of normalPositions) {
       preservedAssignments[pos.id] = staffAssignments[dateStr][pos.id]
         ? [...staffAssignments[dateStr][pos.id]]
         : [];
     }
-
     const maxRetries = 10;
     let attempt = 0;
     let assignmentValid = false;
     while (attempt < maxRetries && !assignmentValid) {
-      // 再試行開始時にバックアップ状態で初期化
       for (const pos of normalPositions) {
         staffAssignments[dateStr][pos.id] = [...(preservedAssignments[pos.id] || [])];
       }
-      // 利用可能スタッフの再計算
       const availableStaff = new Set(filteredStaffList.map((s) => s.name));
       [...holidayStaffYukyu, ...holidayStaffFurikyu, ...holidayStaffDaikyu].forEach((s) =>
         availableStaff.delete(s.name)
@@ -394,50 +400,102 @@ export async function POST(request: Request) {
       const dailyAssigned = new Set<string>(); // staffSeveral=false 用
       const dailyAssignedSeveral = new Set<string>(); // staffSeveral=true 用
 
-      // --- 依存ポジションの割当処理 ---
-      let depAssignmentValid = true;
+      // ①【依存ポジションの割当処理】
       for (const pos of normalPositions) {
-        if (!pos.dependence || pos.dependence.trim() === "") continue; // 依存設定がなければスキップ
+        if (!pos.dependence || pos.dependence.trim() === "") continue;
         const independentPosId = pos.dependence;
         const prevBusinessDateStr = await getPreviousBusinessDay(date);
-        // 前営業日の割当結果が存在しない場合は、未配置とする
         if (
           !prevBusinessDateStr ||
           !staffAssignments[prevBusinessDateStr] ||
           !staffAssignments[prevBusinessDateStr][independentPosId] ||
           staffAssignments[prevBusinessDateStr][independentPosId].length === 0
         ) {
-          // ここでは「未配置」として割り当てるか、もしくは通常の割当処理に任せる
           staffAssignments[dateStr][pos.id].push("未配置");
-          continue; // 次のポジションへ
+          continue;
         }
-        // 直近で配置された独立ポジションのスタッフを候補とする
         const candidateStaff =
           staffAssignments[prevBusinessDateStr][independentPosId][
             staffAssignments[prevBusinessDateStr][independentPosId].length - 1
           ];
-        // 当日の availableStaff に含まれていれば採用
-        if (!availableStaff.has(candidateStaff)) {
-          // 候補が当日利用可能でなければ、未配置とする
-          staffAssignments[dateStr][pos.id].push("未配置");
-          continue;
-        }
         staffAssignments[dateStr][pos.id].push(candidateStaff);
         availableStaff.delete(candidateStaff);
+        dailyAssigned.add(candidateStaff);
       }
 
-      if (!depAssignmentValid) {
-        attempt++;
-        console.log(`[${dateStr}] 依存ポジションの割当失敗（再試行 ${attempt} 回目）`);
-        continue;
-      }
-
-      // --- 通常（独立）ポジションの割当処理 ---
-      // 依存ポジションはすでに処理済みのため、依存設定がないポジションのみ
+      // ②【被依存ポジションの割当処理】
       for (const pos of normalPositions) {
         if (pos.dependence && pos.dependence.trim() !== "") continue;
+        if (!referencedIndependentIds.has(pos.id)) continue;
+        const nextBusinessDateStr = await getNextBusinessDay(date);
+        const specialHolidaysNext =
+          nextBusinessDateStr && preCalcSpecialHolidays[nextBusinessDateStr]
+            ? preCalcSpecialHolidays[nextBusinessDateStr]
+            : new Set<string>();
+        const holidaysYukyuNext = nextBusinessDateStr
+          ? new Set(
+              filteredStaffList
+                .filter(s => s.holidaysYukyu && s.holidaysYukyu.includes(nextBusinessDateStr))
+                .map(s => s.name)
+            )
+          : new Set<string>();
+        const holidaysFurikyuNext = nextBusinessDateStr
+          ? new Set(
+              filteredStaffList
+                .filter(s => s.holidaysFurikyu && s.holidaysFurikyu.includes(nextBusinessDateStr))
+                .map(s => s.name)
+            )
+          : new Set<string>();
+        const holidaysDaikyuNext = nextBusinessDateStr
+          ? new Set(
+              filteredStaffList
+                .filter(s => s.holidaysDaikyu && s.holidaysDaikyu.includes(nextBusinessDateStr))
+                .map(s => s.name)
+            )
+          : new Set<string>();
+        console.log(
+          `被依存ポジション ${pos.name}：次営業日(${nextBusinessDateStr})の specialHolidays:`,
+          specialHolidaysNext,
+          "holidaysYukyu:",
+          holidaysYukyuNext,
+          "holidaysFurikyu:",
+          holidaysFurikyuNext,
+          "holidaysDaikyu:",
+          holidaysDaikyuNext
+        );
+        const candidates = filteredStaffList.filter((s) => {
+          if (!s.availablePositions || !s.availablePositions.includes(pos.name)) return false;
+          if (!availableStaff.has(s.name)) return false;
+          if (dailyAssigned.has(s.name)) return false;
+          if (
+            specialHolidaysNext.has(s.name) ||
+            holidaysYukyuNext.has(s.name) ||
+            holidaysFurikyuNext.has(s.name) ||
+            holidaysDaikyuNext.has(s.name)
+          )
+            return false;
+          return true;
+        }).map((s) => s.name);
+        console.log(`被依存ポジション ${pos.name}：候補スタッフ:`, candidates);
+        if (candidates.length > 0) {
+          const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+          staffAssignments[dateStr][pos.id].push(chosen);
+          dailyAssigned.add(chosen);
+          availableStaff.delete(chosen);
+        } else {
+          staffAssignments[dateStr][pos.id].push(pos.required ? "未配置" : "");
+        }
+      }
+
+      // ③【通常ポジション（その他）の割当処理】（独立で、被依存ではないもの）
+      for (const pos of normalPositions) {
+        if (pos.dependence && pos.dependence.trim() !== "") continue;
+        if (referencedIndependentIds.has(pos.id)) continue;
         if (pos.staffSeveral) {
-          // staffSeveral=true の処理（既存ロジックそのまま）
+          // staffSeveral=true は既存の個別カウンター staffSeveralCounts を使用
+          if (!staffSeveralCounts[pos.id]) {
+            staffSeveralCounts[pos.id] = {};
+          }
           const candidates = filteredStaffList.filter((s) => {
             if (!s.availablePositions || !s.availablePositions.includes(pos.name)) return false;
             if (dailyAssignedSeveral.has(s.name)) return false;
@@ -448,26 +506,31 @@ export async function POST(request: Request) {
             )
               return false;
             if (specialAssignedTomorrowOnly.has(s.name)) return false;
-            return availableStaff.has(s.name);
+            return true;
           });
+          console.log(`通常ポジション ${pos.name}（staffSeveral=true）: 候補スタッフ:`, candidates.map(s => s.name));
           if (candidates.length > 0) {
             let minCount = Infinity;
             for (const s of candidates) {
-              const count = staffSeveralCount[s.name] || 0;
+              const count = staffSeveralCounts[pos.id][s.name] || 0;
               if (count < minCount) minCount = count;
             }
             const finalCandidates = candidates.filter(
-              (s) => (staffSeveralCount[s.name] || 0) === minCount
+              (s) => (staffSeveralCounts[pos.id][s.name] || 0) === minCount
             );
             const chosenObj = finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
             const chosen = chosenObj.name;
             staffAssignments[dateStr][pos.id].push(chosen);
             dailyAssignedSeveral.add(chosen);
-            staffSeveralCount[chosen] = (staffSeveralCount[chosen] || 0) + 1;
+            staffSeveralCounts[pos.id][chosen] = (staffSeveralCounts[pos.id][chosen] || 0) + 1;
           } else {
             staffAssignments[dateStr][pos.id].push(pos.required ? "未配置" : "");
           }
         } else {
+          // 通常ポジション（staffSeveral=false）の場合、ここで各ポジションごとの個別カウンターを使用
+          if (!normalCounts[pos.id]) {
+            normalCounts[pos.id] = {};
+          }
           let alreadyAssignedName: string | null = null;
           let firstWeekday: Date | null = null;
           if (pos.sameStaffWeekly) {
@@ -510,45 +573,29 @@ export async function POST(request: Request) {
                 return true;
               })
               .map((s) => s.name);
-            // もしこの独立ポジションが他から参照される（依存される）場合、次の平日の利用可能性もチェック
-            if (referencedIndependentIds.has(pos.id)) {
-              let chosen = "";
-              for (const cand of availableForPos) {
-                if (await isCandidateAvailableNextBusinessDay(cand, date, filteredStaffList)) {
-                  chosen = cand;
-                  break;
-                }
+            if (availableForPos.length > 0) {
+              let minCount = Infinity;
+              for (const sName of availableForPos) {
+                const count = normalCounts[pos.id][sName] || 0;
+                if (count < minCount) minCount = count;
               }
-              if (chosen !== "") {
-                staffAssignments[dateStr][pos.id].push(chosen);
-                dailyAssigned.add(chosen);
-                availableStaff.delete(chosen);
-                if (pos.sameStaffWeekly && firstWeekday && formatDateLocal(date) === formatDateLocal(firstWeekday)) {
-                  const weekKey = `${formatDateLocal(firstWeekday)}_${pos.id}`;
-                  weeklyAssignments[weekKey] = chosen;
-                }
-              } else {
-                staffAssignments[dateStr][pos.id].push(pos.required ? "未配置" : "");
+              const finalCandidates = availableForPos.filter(sName => (normalCounts[pos.id][sName] || 0) === minCount);
+              const chosen = finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
+              staffAssignments[dateStr][pos.id].push(chosen);
+              dailyAssigned.add(chosen);
+              availableStaff.delete(chosen);
+              normalCounts[pos.id][chosen] = (normalCounts[pos.id][chosen] || 0) + 1;
+              if (pos.sameStaffWeekly && firstWeekday && formatDateLocal(date) === formatDateLocal(firstWeekday)) {
+                const weekKey = `${formatDateLocal(firstWeekday)}_${pos.id}`;
+                weeklyAssignments[weekKey] = chosen;
               }
             } else {
-              if (availableForPos.length > 0) {
-                const chosen = availableForPos[Math.floor(Math.random() * availableForPos.length)];
-                staffAssignments[dateStr][pos.id].push(chosen);
-                dailyAssigned.add(chosen);
-                availableStaff.delete(chosen);
-                if (pos.sameStaffWeekly && firstWeekday && formatDateLocal(date) === formatDateLocal(firstWeekday)) {
-                  const weekKey = `${formatDateLocal(firstWeekday)}_${pos.id}`;
-                  weeklyAssignments[weekKey] = chosen;
-                }
-              } else {
-                staffAssignments[dateStr][pos.id].push(pos.required ? "未配置" : "");
-              }
+              staffAssignments[dateStr][pos.id].push(pos.required ? "未配置" : "");
             }
           }
         }
       }
 
-      // フォールバック処理：未配置スタッフの再配置
       if (availableStaff.size > 0) {
         const stillUnassigned = Array.from(availableStaff)
           .map((name) => filteredStaffList.find((s) => s.name === name))
@@ -578,16 +625,12 @@ export async function POST(request: Request) {
       } else {
         attempt++;
         console.log(
-          `【${dateStr}】再配置試行 ${attempt} 回目: 未配置のスタッフ -> ${Array.from(
-            availableStaff
-          ).join(", ")}`
+          `【${dateStr}】再配置試行 ${attempt} 回目: 未配置のスタッフ -> ${Array.from(availableStaff).join(", ")}`
         );
       }
     }
-    // ★【通常配置処理 終了】★
   }
 
-  // Excel出力：各通常ポジションの配置結果を outputCell に従って出力
   normalPositions.forEach((pos) => {
     if (!pos.outputCell) return;
     const match = pos.outputCell.match(/^([A-Z]+)(\d+)$/);
