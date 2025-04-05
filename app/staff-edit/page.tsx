@@ -273,6 +273,7 @@ export default function StaffEditPage() {
         </div>
         <div>
           <label className="block mb-1">配置可能ポジション:</label>
+          <p className="text-gray-500 text-sm">＊二交代、待機、日直主、日直副、休み(種類)はここには入れないでください。</p>
           <div className="space-y-2">
             {formData.availablePositions.map((pos, index) => (
               <select

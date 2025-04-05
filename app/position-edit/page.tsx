@@ -385,6 +385,8 @@ export default function PositionEditPage() {
             />
             依存ポジションを設定する
           </label>
+          <p className="text-gray-500 text-sm">＊このポジションには、前日にAというポジションに配置された人がそのまま配置されて欲しい、みたいな時に依存ポジションとしてAを登録しておく。<br />
+          例：切り出しに配置された人は、翌日にはトリミングに配置されるようにしたい時、トリミングのポジション編集で、依存ポジションに切り出しを登録する。</p>
         </div>
         {enableDependence && (
           <div>
@@ -462,7 +464,7 @@ interface CellSelectorProps {
 }
 
 function CellSelector({ positions, onChange, onCellSelect, previewMonth }: CellSelectorProps) {
-  const columns = Array.from({ length: 20 }, (_, i) => String.fromCharCode(65 + i));
+  const columns = Array.from({ length: 23 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 3 }, (_, i) => i + 1);
 
   const cellAssignments: { [cell: string]: Position[] } = {};
