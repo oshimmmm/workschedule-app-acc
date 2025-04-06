@@ -484,7 +484,7 @@ export async function POST(request: Request) {
         ? [...staffAssignments[dateStr][pos.id]]
         : [];
     }
-    const maxRetries = 10;
+    const maxRetries = 15;
     let attempt = 0;
     let assignmentValid = false;
     while (attempt < maxRetries && !assignmentValid) {
@@ -810,6 +810,122 @@ export async function POST(request: Request) {
     }
   });
 
+  // ──────────────────────────────
+// 【Excelの最終フォーマット設定】
+// ──────────────────────────────
+
+// 1行目の高さを70ピクセルにする
+worksheet.getRow(1).height = 70;
+
+// 2行目から32行目の高さを40ピクセルにする
+for (let i = 2; i <= 32; i++) {
+  worksheet.getRow(i).height = 40;
+}
+
+// 塗りつぶし色設定
+// B列とG列を黄色で塗りつぶす
+["B", "G"].forEach((col) => {
+  worksheet.getColumn(col).eachCell((cell) => {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFFF00" } // 黄色
+    };
+  });
+});
+
+// C列、D列、F列を水色で塗りつぶす（例: FF87CEEB）
+["C", "D", "F"].forEach((col) => {
+  worksheet.getColumn(col).eachCell((cell) => {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF87CEEB" } // 水色
+    };
+  });
+});
+
+// E列を少し濃い緑色で塗りつぶす（例: FF008000）
+worksheet.getColumn("E").eachCell((cell) => {
+  cell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF008000" } // 少し濃い緑色
+  };
+});
+
+// 列幅設定（ExcelJS の width は「文字数」で指定）
+// ※105ピクセル ≒ 15文字, 118ピクセル ≒ 17文字, 145ピクセル ≒ 21文字, 220ピクセル ≒ 31文字
+worksheet.getColumn("A").width = 14;
+worksheet.getColumn("B").width = 12;
+worksheet.getColumn("C").width = 15;
+worksheet.getColumn("D").width = 12;
+worksheet.getColumn("E").width = 12;
+worksheet.getColumn("G").width = 15;
+worksheet.getColumn("H").width = 15;
+worksheet.getColumn("F").width = 17;
+worksheet.getColumn("I").width = 21;
+worksheet.getColumn("T").width = 21;
+
+// 罫線設定
+
+// 1行目に二重線の下罫線を付ける
+worksheet.getRow(1).eachCell((cell) => {
+  cell.border = {
+    ...cell.border,
+    bottom: { style: "double", color: { argb: "FF000000" } }
+  };
+});
+
+// A列に二重線の右罫線を付ける
+worksheet.getColumn("A").eachCell((cell) => {
+  cell.border = {
+    ...cell.border,
+    right: { style: "double", color: { argb: "FF000000" } }
+  };
+});
+
+// 2行目から32行目に点線の下罫線を付ける
+for (let i = 2; i <= 32; i++) {
+  worksheet.getRow(i).eachCell((cell) => {
+    cell.border = {
+      ...cell.border,
+      bottom: { style: "dotted", color: { argb: "FF000000" } }
+    };
+  });
+}
+
+// B列からW列に点線の右罫線を付ける
+for (let charCode = "B".charCodeAt(0); charCode <= "W".charCodeAt(0); charCode++) {
+  const colLetter = String.fromCharCode(charCode);
+  worksheet.getColumn(colLetter).eachCell((cell) => {
+    cell.border = {
+      ...cell.border,
+      right: { style: "dotted", color: { argb: "FF000000" } }
+    };
+  });
+}
+
+// ──────────────────────────────
+// 【A列からZ列の2～35行目で "未配置" セルを赤く塗りつぶす処理】
+// ──────────────────────────────
+for (let row = 2; row <= 35; row++) {
+  // A～Zは文字コード65（A）～90（Z）
+  for (let charCode = 65; charCode <= 90; charCode++) {
+    const colLetter = String.fromCharCode(charCode);
+    const cell = worksheet.getCell(`${colLetter}${row}`);
+    if (cell.value === "未配置") {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFF0000" } // 赤色
+      };
+    }
+  }
+}
+
+
+  
   const buffer = await workbook.xlsx.writeBuffer();
   const uint8Array = new Uint8Array(buffer);
   const arrayBuffer = uint8Array.buffer;
