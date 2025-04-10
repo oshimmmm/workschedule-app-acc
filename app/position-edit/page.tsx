@@ -259,6 +259,8 @@ export default function PositionEditPage() {
         </div>
         <div>
           <label className="block mb-2 font-medium">勤務表イメージ:</label>
+          <p className="text-gray-500 text-sm">＊ポジションを新しく登録する場合、勤務表のどのセルに表示させたいか、選んでクリックしてください。空のセルを選んで下さい。</p>
+          <p className="text-gray-500 text-sm">＊登録されているポジションを編集したいときは、そのポジションのセルをクリックしてください。</p>
           <div className="mb-2">
             <CellSelector
               positions={filteredPositions}

@@ -285,6 +285,15 @@ export default function HolidayEditPage() {
           }}
         />
       </Box>
+      <Box sx={{ display: "flex", gap: 2 }}>
+        <Button variant="contained" color="primary" onClick={handleConfirm} >
+          確定
+        </Button>
+        <Button variant="contained" color="error" onClick={handleClear}>
+          古い休みデータをクリア
+        </Button>
+        <p>＊”古い休みデータをクリア”を押すと2年以上経過した休みデータが削除されます。データ量圧迫を防ぐために行って下さい</p>
+      </Box>
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, my: 2 }}>
         {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
           <Typography key={day} align="center" sx={{ fontWeight: 600 }}>
@@ -312,15 +321,7 @@ export default function HolidayEditPage() {
           ))
         )}
       </Box>
-      <Box sx={{ display: "flex", gap: 2 }}>
-        <Button variant="contained" color="primary" onClick={handleConfirm} >
-          確定
-        </Button>
-        <Button variant="contained" color="error" onClick={handleClear}>
-          古い休みデータをクリア
-        </Button>
-        <p>＊”古い休みデータをクリア”を押すと2年以上経過した休みデータが削除されます。データ量圧迫を防ぐために行って下さい</p>
-      </Box>
+      
     </Box>
   );
 }
