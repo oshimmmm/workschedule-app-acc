@@ -53,8 +53,8 @@ export default function StaffEditPage() {
   };
 
   const filteredPositionOptions = selectedDepartment
-  ? positionOptions.filter((option) => option.departments && option.departments.includes(selectedDepartment))
-  : positionOptions;
+    ? positionOptions.filter((option) => option.departments && option.departments.includes(selectedDepartment))
+    : positionOptions;
 
   // APIからポジション情報を取得（departments情報も含む）
   const fetchPositions = async () => {
@@ -74,17 +74,26 @@ export default function StaffEditPage() {
   // スタッフ情報登録／更新の送信処理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     // availablePositions の空文字は除外
     const cleanedPositions = formData.availablePositions.filter(
       (pos) => pos.trim() !== ""
     );
+
     // departmentsの空文字も除外
     const cleanedDepartments = formData.departments
       .map((d) => d.trim())
       .filter((d) => d !== "");
+
+    // 選択されなかったポジションを削除
+    const validPositions = filteredPositionOptions.map((option) => option.name);
+    const updatedPositions = cleanedPositions.filter((pos) =>
+      validPositions.includes(pos)
+    );
+
     const payload = {
       ...formData,
-      availablePositions: cleanedPositions,
+      availablePositions: updatedPositions,
       departments: cleanedDepartments,
     };
 
@@ -209,7 +218,17 @@ export default function StaffEditPage() {
           部門選択:
           <select
             value={selectedDepartment}
-            onChange={(e) => setSelectedDepartment(e.target.value)}
+            onChange={(e) => {
+              const dept = e.target.value;
+              setSelectedDepartment(dept);
+              // 選択された部門名があれば、配属先の入力欄に自動入力
+              if (dept) {
+                setFormData((prev) => ({ ...prev, departments: [dept, ""] }));
+              } else {
+                // 空の場合は初期値に戻す（動的入力用の空文字を含める）
+                setFormData((prev) => ({ ...prev, departments: [""] }));
+              }
+            }}
             className="ml-2 p-2 border border-gray-300 rounded"
           >
             <option value="">全て</option>
@@ -220,6 +239,7 @@ export default function StaffEditPage() {
             ))}
           </select>
         </label>
+        <p className="text-gray-500 text-sm">↑まずは自部署を選択してください↑</p>
       </div>
 
       {/* ここに自動スクロール対象となるヘッダー */}
@@ -257,7 +277,7 @@ export default function StaffEditPage() {
         </div>
 
         <div>
-          <label className="block mb-1">配属先:　宿直に入れるようになったら、配属先に追加登録してください。”夜勤用作成”で使用します。</label>
+          <label className="block mb-1">配属先:　二交代や待機、日直主あるいは日直副に入れるようになったら、配属先に1つずつ入力して、追加登録してください。”夜勤用作成”で使用します。</label>
           <div className="space-y-2">
             {formData.departments.map((department, index) => (
               <input
